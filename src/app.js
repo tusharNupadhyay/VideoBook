@@ -16,4 +16,11 @@ app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 app.use(express.static("public"));
 //to access and set cookies(perform CRUD operation) on user from server
 app.use(cookieParser());
+
+//Routes import
+import userRouter from "./routes/user.routes.js";
+
+//routes declaration
+app.use("/api/v1/users", userRouter); //good practice to define api and versioning if you are using api
+
 export { app };
