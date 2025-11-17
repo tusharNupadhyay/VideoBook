@@ -15,6 +15,7 @@ app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 //static to store files, images on your server on public folder
 app.use(express.static("public"));
 //to access and set cookies(perform CRUD operation) on user from server
+//attaches cookies to req so you can use req.cookies
 app.use(cookieParser());
 
 //Routes import
