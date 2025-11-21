@@ -3,7 +3,14 @@ import {
   registerUser,
   loginUser,
   logOutUser,
-  refreshAccessToken
+  refreshAccessToken,
+  changeCurrentPassword,
+  getCurrentUser,
+  updateAccountDetails,
+  updateUserAvatar,
+  updateUserCoverImage,
+  getUserChannelProfile,
+  getWatchHistory,
 } from "../controllers/user.controller.js";
 import { upload } from "../middlewares/multer.middleware.js";
 import { ApiError } from "../utils/ApiError.js";
@@ -30,5 +37,16 @@ router.route("/login").post(loginUser);
 //secured routes (user must be logged In)
 router.route("/logout").post(verifyJWT, logOutUser);
 router.route("/refresh-token").post(refreshAccessToken);
+router.route("/change-password").post(verifyJWT, changeCurrentPassword);
+router.route("/current-user").post(verifyJWT, getCurrentUser);
+router.route("/update-account").patch(verifyJWT, updateAccountDetails); // patch updates only specific fields that you send unlike put which replaces the entire resource and may overwrite
+router
+  .route("/avatar")
+  .patch(verifyJWT, upload.single("avatar"), updateUserAvatar);
+router
+  .route("/cover-image")
+  .patch(verifyJWT, upload.single("coverImage"), updateUserCoverImage);
+router.route("/c/:username").get(verifyJWT, getUserChannelProfile); // :username should be same as req.params in the controller {username}
+router.route("/history").get(verifyJWT, getWatchHistory);
 
 export default router;
