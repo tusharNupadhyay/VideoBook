@@ -345,7 +345,7 @@ const getWatchHistory = asyncHandler(async (req, res) => {
   const user = await User.aggregate([
     {
       $match: {
-        _id: new mongoose.Types.ObjectId(req.user._id), //check whether simple req.user._id works or not
+        _id: req.user._id, //no need to wrap this into new mongoose.Types.ObjectId() as user is fetched by mongoose and attached to req in verifyJWT
       },
     },
     {
