@@ -345,7 +345,7 @@ const getWatchHistory = asyncHandler(async (req, res) => {
   const user = await User.aggregate([
     {
       $match: {
-        _id: new mongoose.Types.ObjectId(req.user._id),
+        _id: new mongoose.Types.ObjectId(req.user._id), //check whether simple req.user._id works or not
       },
     },
     {
@@ -361,7 +361,7 @@ const getWatchHistory = asyncHandler(async (req, res) => {
               from: "users",
               localField: "owner",
               foreignField: "_id",
-              as: "owner",
+              as: "ownerArray",
               pipeline: [
                 {
                   //doing this inside owner will project every details under owner not outside
@@ -371,17 +371,20 @@ const getWatchHistory = asyncHandler(async (req, res) => {
                     avatar: 1,
                   },
                 },
-                //since owner will be array and frontend will have to take 0th element, so to make it easier we will add another field owner(to override previous owner ) and user $first to get first element from owner array
-                //by doing this , we can use .owner to get access instead of getting 0th element from array
-                {
-                  $addFields: {
-                    owner: {
-                      $first: "$owner",
-                    },
-                  },
-                },
               ],
             },
+          },
+          //this creates an owner object with username, avatar, fullname field
+          {
+            $addFields: {
+              owner: {
+                $first: "$ownerArray",
+              },
+            },
+          },
+          {
+            //this removes the ownerarray because owner object is already there
+            $project: { ownerArray: 0 },
           },
         ],
       },

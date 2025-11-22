@@ -38,7 +38,7 @@ router.route("/login").post(loginUser);
 router.route("/logout").post(verifyJWT, logOutUser);
 router.route("/refresh-token").post(refreshAccessToken);
 router.route("/change-password").post(verifyJWT, changeCurrentPassword);
-router.route("/current-user").post(verifyJWT, getCurrentUser);
+router.route("/current-user").get(verifyJWT, getCurrentUser);
 router.route("/update-account").patch(verifyJWT, updateAccountDetails); // patch updates only specific fields that you send unlike put which replaces the entire resource and may overwrite
 router
   .route("/avatar")
