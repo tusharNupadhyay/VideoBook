@@ -28,7 +28,10 @@ const registerUser = asyncHandler(async (req, res) => {
   //use await because findone returns a promise and a promise object is a truthy
   //$or-mongodb logical operator same as 'OR'
   const existedUser = await User.findOne({
-    $or: [{ username }, { email }],
+    $or: [
+      { username: username.trim().toLowerCase() },
+      { email: email.trim().toLowerCase() },
+    ],
   });
   if (existedUser)
     throw new ApiError(409, "User with email or username already exists");
@@ -51,7 +54,7 @@ const registerUser = asyncHandler(async (req, res) => {
     coverImage: coverImage?.url || "",
     email,
     password,
-    username: username.toLowerCase(),
+    username,
   });
 
   const createdUser = await User.findById(user._id).select(
@@ -96,7 +99,10 @@ const loginUser = asyncHandler(async (req, res) => {
   if (!username && !email)
     throw new ApiError(400, "username or email is required");
   const user = await User.findOne({
-    $or: [{ username }, { email }],
+    $or: [
+      { username: username.trim().toLowerCase() },
+      { email: email.trim().toLowerCase() },
+    ],
   });
   if (!user) throw new ApiError(404, "username or email does not exist");
   //'User' is an object of mongoose so you can use mongoose method like findOne,updateOne but the methods that you created in user.models.js like isPasswordCorrect,generateAccesstoken are available in 'user'(which you have extracted from database)
@@ -200,7 +206,7 @@ const getCurrentUser = asyncHandler(async (req, res) => {
 });
 const updateAccountDetails = asyncHandler(async (req, res) => {
   const { fullName, email } = req.body;
-  if (!fullName || !email) throw new ApiError(400, "All fields are required");
+  if (!fullName.trim() || !email.trim()) throw new ApiError(400, "All fields are required");
 
   //new: true returns updated information
   const user = await User.findByIdAndUpdate(
@@ -271,7 +277,7 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
   const channel = await User.aggregate([
     {
       $match: {
-        username: username?.toLowerCase(), //user get's matched
+        username: username?.trim().toLowerCase(), //user get's matched
       },
     },
     {

@@ -14,19 +14,25 @@ const videoSchema = new mongoose.Schema(
     title: {
       type: String,
       required: true,
+      trim: true
     },
     description: {
       type: String,
-      required: true,
+      trim: true,
+      default: ""
     },
     duration: {
       type: Number,
       required: true,
     },
-    views: {
-      type: Number,
-      default: 0,
-    },
+    views: [
+      {
+        userId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        },
+      },
+    ],
     isPublished: {
       type: Boolean,
       default: true,
