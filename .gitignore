@@ -1,4 +1,6 @@
 #taken from .gitignore generator
+#asset folder in public
+public/assets/*
 # Logs
 logs
 *.log

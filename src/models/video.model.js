@@ -27,10 +27,8 @@ const videoSchema = new mongoose.Schema(
     },
     views: [
       {
-        userId: {
           type: mongoose.Schema.Types.ObjectId,
           ref: "User",
-        },
       },
     ],
     isPublished: {

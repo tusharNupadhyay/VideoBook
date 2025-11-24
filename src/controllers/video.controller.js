@@ -88,7 +88,7 @@ const getAllVideos = asyncHandler(async (req, res) => {
   //with await mongoose sends the pipeline to mongoDB which runs the aggregation and returns the result array
   const aggregate = Video.aggregate(pipeline);
   const result = await Video.aggregatePaginate(aggregate, options);
-  console.log(result);
+  // console.log(result);
   return res
     .status(200)
     .json(new ApiResponse(200, result, "All videos fetched successfully"));
@@ -158,7 +158,7 @@ const publishVideo = asyncHandler(async (req, res) => {
   const { title, description } = req.body;
   const userId = req.user?._id;
   validateVideoId(userId);
-  if (!title.trim()) throw new ApiError(400, "Title is required");
+  if (!title?.trim()) throw new ApiError(400, "Title is required");
   //thumbnail and videofile will come from multer
   //take the filepath and send it to cloudinary
   //extract the duration from cloudinary output
@@ -272,7 +272,7 @@ const updateVideoDetails = asyncHandler(async (req, res) => {
     },
     { new: true }
   );
-  if (!updatedVideo) throw new ApiError(403, "You cannot update this video");
+  if (!video) throw new ApiError(403, "You cannot update this video");
   return res
     .status(200)
     .json(new ApiResponse(200, video, "Video Details updated successfully"));
