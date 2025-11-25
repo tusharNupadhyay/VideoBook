@@ -361,6 +361,7 @@ const getWatchHistory = asyncHandler(async (req, res) => {
         foreignField: "_id",
         as: "watchHistory",
         pipeline: [
+          //this pipeline runs on each video found
           //this pipeline is to look up for owner(user)
           {
             $lookup: {
