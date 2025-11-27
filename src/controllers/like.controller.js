@@ -20,9 +20,7 @@ const toggleVideoLike = asyncHandler(async (req, res) => {
 
   //check whether the video exists or not
   const video = await Video.findById(videoId);
-  if (!video) {
-    return res.status(404).json(new ApiResponse(404, {}, "Video not found"));
-  }
+  if (!video) throw new ApiError(404, "Video does not exist");
 
   //find whether like by user exist on this video or not
   const isLiked = await Like.findOne({
@@ -46,8 +44,7 @@ const toggleCommentLike = asyncHandler(async (req, res) => {
   const userId = req.user?._id;
   //check if comment exist or not
   const comment = await Comment.findById(commentId);
-  if (!comment)
-    return res.status(404).json(new ApiResponse(404, {}, "Comment not found"));
+  if (!comment) throw new ApiError(404, "Comment does not exist");
   const isLiked = await Like.findOne({ comment: commentId, likedBy: userId });
   if (!isLiked) {
     const like = await Like.create({
@@ -66,8 +63,8 @@ const toggleTweetLike = asyncHandler(async (req, res) => {
   const userId = req.user?._id;
 
   const tweet = await Tweet.findById(tweetId);
-  if (!tweet)
-    return res.status(404).json(new ApiResponse(404, {}, "Tweet not found"));
+  if (!tweet) throw new ApiError(404, "Tweet does not exist");
+
   const isLiked = await Like.findOne({ tweet: tweetId, likedBy: userId });
   if (!isLiked) {
     const like = await Like.create({
@@ -144,4 +141,4 @@ const getLikedVideos = asyncHandler(async (req, res) => {
     );
 });
 
-export { toggleVideoLike, toggleCommentLike, toggleTweetLike ,getLikedVideos};
+export { toggleVideoLike, toggleCommentLike, toggleTweetLike, getLikedVideos };

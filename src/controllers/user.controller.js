@@ -206,7 +206,8 @@ const getCurrentUser = asyncHandler(async (req, res) => {
 });
 const updateAccountDetails = asyncHandler(async (req, res) => {
   const { fullName, email } = req.body;
-  if (!fullName.trim() || !email.trim()) throw new ApiError(400, "All fields are required");
+  if (!fullName.trim() || !email.trim())
+    throw new ApiError(400, "All fields are required");
 
   //new: true returns updated information
   const user = await User.findByIdAndUpdate(
@@ -397,15 +398,16 @@ const getWatchHistory = asyncHandler(async (req, res) => {
       },
     },
   ]);
-  return res
-    .status(200)
-    .json(
-      new ApiResponse(
-        200,
-        user?.[0]?.watchHistory,
-        "watch history fetched successfully"
-      )
-    );
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        totalHistory: user?.[0]?.watchHistory.length || 0,
+        history: user?.[0]?.watchHistory,
+      },
+      "watch history fetched successfully"
+    )
+  );
 });
 export {
   registerUser,

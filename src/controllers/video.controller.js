@@ -142,30 +142,18 @@ const addView = asyncHandler(async (req, res) => {
 const getAllUserVideos = asyncHandler(async (req, res) => {
   const { userId } = req.params;
   validateVideoId(userId);
-  const videos = await Video.aggregate([
-    {
-      //convert userId string which comes from req.params to mongodb ID
-      $match: { owner: new mongoose.Types.ObjectId(userId) },
-    },
-    {
-      $project: {
-        title: 1,
-        thumbnail: 1,
-        description: 1,
-        duration: 1,
-        isPublished: 1,
-        createdAt: 1,
-        viewCount: { $size: { $ifNull: ["$views", []] } },
-      },
-    },
-    {
-      $sort: { createdAt: -1 }, //sort by newest videos first
-    },
-  ]);
+  const videos = await Video.find({ owner: userId })
+    .select("title thumbnail description duration isPublished createdAt")
+    .sort({ createdAt: -1 });
+  const result = videos.map((video) => ({
+    //because video is mongoose instance so we cannot use spread operator to copy existing fields , we have to use toObject to convert is to plain javascript object
+    ...video.toObject(),
+    viewCount: video.views?.length || 0,
+  }));
   return res
     .status(200)
     .json(
-      new ApiResponse(200, videos, "All videos of user fetched successfully")
+      new ApiResponse(200, result, "All videos of user fetched successfully")
     );
 });
 const publishVideo = asyncHandler(async (req, res) => {
@@ -317,7 +305,7 @@ const deleteVideo = asyncHandler(async (req, res) => {
 const togglePublishStatus = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
   validateVideoId(videoId);
-  const userId = req.user._id;
+  const userId = req.user?._id;
   if (!userId) throw new ApiError(401, "Unauthorized: Login required");
 
   //use findByIdandupdate when you only search using id , use findbyoneandupdate when you want to match by more fields like owner
