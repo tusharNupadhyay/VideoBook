@@ -95,6 +95,7 @@ const getAllVideos = asyncHandler(async (req, res) => {
 });
 
 const addView = asyncHandler(async (req, res) => {
+  //add a view and add to the user's watch history if user is registered
   const { videoId } = req.params;
   validateVideoId(videoId);
   const userId = req.user?._id;
@@ -114,6 +115,19 @@ const addView = asyncHandler(async (req, res) => {
     }
   );
   if (!updatedView) throw new ApiError(404, "Video not found");
+
+  await User.findByIdAndUpdate(userId, {
+    //remove the video if it already exists in watch history (ignores if it doesn't)so that we can add it to front
+    $pull: { watchHistory: videoId },
+    $push: {
+      watchHistory: {
+        //each is push multiple items at once , push can only push one item , so if you want to use postion then you have to use $each
+        $each: [videoId],
+        $position: 0,
+      },
+    },
+  });
+
   return res
     .status(200)
     .json(
@@ -227,7 +241,6 @@ const getVideoById = asyncHandler(async (req, res) => {
         },
       },
     },
-    
   ]);
   if (!video || video.length === 0) throw new ApiError(404, "Video not found");
   return res
