@@ -143,12 +143,13 @@ const getAllUserVideos = asyncHandler(async (req, res) => {
   const { userId } = req.params;
   validateVideoId(userId);
   const videos = await Video.find({ owner: userId })
-    .select("title thumbnail description duration isPublished createdAt")
+    .select("title thumbnail description duration isPublished createdAt views")
     .sort({ createdAt: -1 });
   const result = videos.map((video) => ({
     //because video is mongoose instance so we cannot use spread operator to copy existing fields , we have to use toObject to convert is to plain javascript object
     ...video.toObject(),
     viewCount: video.views?.length || 0,
+    views: undefined, // remove views array
   }));
   return res
     .status(200)
