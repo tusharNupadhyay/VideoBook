@@ -43,6 +43,7 @@ app.use((err, req, res, next) => {
   return res.status(statusCode).json({
     success: false,
     message: err.message || "Something went wrong",
+    //err stack is helpful in dev mode because it traces where err came from but in prod mode hide it as it reveals file path , folder/backend structure to users/attackers
     stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
   });
 });
