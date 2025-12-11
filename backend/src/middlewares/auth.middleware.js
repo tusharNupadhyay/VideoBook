@@ -19,12 +19,20 @@ export const verifyJWT = asyncHandler(async (req,res,next) => {
   const token = req.cookies?.accessToken || req.header("authorization")?.split(" ")[1];
   if(!token) throw new ApiError(401,"Unauthorized request");
 
-  const decoded = jwt.verify(token,process.env.ACCESS_TOKEN_SECRET);
+  try {
+    const decoded = jwt.verify(token,process.env.ACCESS_TOKEN_SECRET);
+  
+    const user = await User.findById(decoded?._id).select("-password -refreshToken");
+      
+    if(!user) throw new ApiError(401,"Invalid Access Token");  
+    req.user  = user;
+    next();
+  } catch (error) {
+    if (error.name === "TokenExpiredError") {
+      throw new ApiError(401, "TokenExpired");
+    }
 
-  const user = await User.findById(decoded?._id).select("-password -refreshToken");
-    
-  if(!user) throw new ApiError(401,"Invalid Access Token");   // discuss about frontend
-  req.user  = user;
-  next();
+    throw new ApiError(401, "Invalid Access Token");
+  }
   
 })

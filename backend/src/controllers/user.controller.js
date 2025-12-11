@@ -93,18 +93,18 @@ const loginUser = asyncHandler(async (req, res) => {
   //password check
   //access and refresh token generate
   //send cookie
-  const { email, username, password } = req.body;
+  const { identifier, password } = req.body;
 
   // or you can write if(!(username || email))
-  if (!username?.trim() && !email?.trim())
+  if (!identifier?.trim())
     throw new ApiError(400, "username or email is required");
   const user = await User.findOne({
     $or: [
-      { username: username?.trim().toLowerCase() },
-      { email: email?.trim().toLowerCase() },
+      { username: identifier?.trim().toLowerCase() },
+      { email: identifier?.trim().toLowerCase() },
     ],
   });
-  if (!user) throw new ApiError(404, "username or email does not exist");
+  if (!user) throw new ApiError(401, "username or email does not exist");
   //'User' is an object of mongoose so you can use mongoose method like findOne,updateOne but the methods that you created in user.models.js like isPasswordCorrect,generateAccesstoken are available in 'user'(which you have extracted from database)
   const isPasswordValid = await user.isPasswordCorrect(password);
   if (!isPasswordValid) throw new ApiError(401, "invalid user credentials");
@@ -117,12 +117,14 @@ const loginUser = asyncHandler(async (req, res) => {
     "-password -refreshToken"
   );
 
+  const isProduction = process.env.NODE_ENV === "production";
   //cookies
   //by setting these conditions true, cookies will only be modified by server not frontend
   const options = {
     httpOnly: true, //makes cookies inaccessible to javascript in the browser(document.cookie),protect against xss attacks
-    secure: true, //cookies sent only over https not http
+    secure: isProduction, //cookies sent only over https not http
     //secure: true may prevent cookies from being set, so use secure: process.env.NODE_ENV = "production"
+    sameSite: isProduction ? "none" : "lax",
   };
   return res
     .status(200)
@@ -131,7 +133,7 @@ const loginUser = asyncHandler(async (req, res) => {
     .json(
       new ApiResponse(
         200,
-        { user: loggedInUser, accessToken, refreshToken },
+        { user: loggedInUser },
         "user logged in successfully"
       )
     );
@@ -154,7 +156,7 @@ const logOutUser = asyncHandler(async (req, res) => {
 const refreshAccessToken = asyncHandler(async (req, res) => {
   //method to generate new access and refresh tokens
   const incomingRefreshToken =
-    req.cookies.refreshToken || req.body.refreshToken; //(for mobile app)
+    req.cookies?.refreshToken || req.body?.refreshToken; //(for mobile app)
   if (!incomingRefreshToken) throw new ApiError(401, "Unauthorized request");
   try {
     const decoded = jwt.verify(
@@ -165,9 +167,11 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
     if (!user) throw new ApiError(401, "Invalid Refresh Token");
     if (incomingRefreshToken !== user?.refreshToken)
       throw new ApiError(401, "Refresh token is expired or used");
+    const isProduction = process.env.NODE_ENV === "production";
     const options = {
       httpOnly: true,
-      secure: true,
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax",
     };
     const { accessToken, refreshToken: newRefreshToken } =
       await generateAccessRefreshTokens(user._id);

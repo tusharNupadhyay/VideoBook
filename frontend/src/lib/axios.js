@@ -1,4 +1,4 @@
-import config from '../config/config';
+import config from "./config"
 import axios from 'axios';
 
 const api = axios.create({
