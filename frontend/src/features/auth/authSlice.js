@@ -2,7 +2,7 @@ import { createSlice } from '@reduxjs/toolkit';
 import { registerUser, loginUser, logoutUser, fetchUser } from './authActions';
 
 const initialState = {
-  loading: false,
+  loading: true,
   userInfo: null,
   error: null,
   success: false,
@@ -73,14 +73,25 @@ const authSlice = createSlice({
       })
       .addCase(logoutUser.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload;
+        state.error = action.payload || action.payload.message;
       })
       //FETCH USER BUILDER
+      .addCase(fetchUser.pending,(state) => {
+        state.loading = true;
+        state.error = null;
+        state.success = false;
+      })
       .addCase(fetchUser.fulfilled, (state, action) => {
         state.userInfo = action.payload;
+        state.success = true;
+        state.error =false;
+        state.loading = false;
       })
-      .addCase(fetchUser.rejected, (state) => {
+      .addCase(fetchUser.rejected, (state,action) => {
         state.userInfo = null;
+        state.loading =false;
+        state.error = action.payload || action.payload.message;
+        state.success =false;
       });
   },
 });

@@ -21,11 +21,18 @@ export default function Navbar() {
   };
   return (
     <nav className="h-16 bg-white shadow flex items-center px-4 gap-2">
-      <p className='px-4 py-2 font-semibold text-gray-700 '>VideoBook</p>
-      <div className='flex flex-1 justify-center mx-30 border-gray-400 rounded gap-2 '>
-        <input type='text' placeholder='search' className='focus:outline-none flex-1 w-1.5 rounded  px-3 py-2 bg-slate-200' />
-        <button className='px-4 py-2 bg-slate-300 hover:bg-slate-400 rounded'> search</button>
-        </div>
+      <p className="px-4 py-2 font-semibold text-gray-700 ">VideoBook</p>
+      <div className="flex flex-1 justify-center mx-30 border-gray-400 rounded gap-2 ">
+        <input
+          type="text"
+          placeholder="search"
+          className="focus:outline-none flex-1 w-1.5 rounded  px-3 py-2 bg-slate-200"
+        />
+        <button className="px-4 py-2 bg-slate-300 hover:bg-slate-400 rounded">
+          {' '}
+          search
+        </button>
+      </div>
       {userInfo ? (
         // If user is logged in
         <div className="flex gap-4">
@@ -36,12 +43,15 @@ export default function Navbar() {
             Logout
           </button>
 
-           <button
-            onClick={() => navigate(`/channel/${userInfo.username}`)}
+          <button
+            onClick={() => {
+              console.log(userInfo);
+              navigate('/profile');
+            }}
             className="px-4 py-2 bg-blue-600 text-white rounded-4xl hover:bg-blue-800"
           >
             Profile
-          </button> 
+          </button>
         </div>
       ) : (
         // If user is NOT logged in
@@ -60,7 +70,6 @@ export default function Navbar() {
             Register
           </button>
         </div>
-
       )}
     </nav>
   );

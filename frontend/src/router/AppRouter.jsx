@@ -10,6 +10,7 @@ import Login from '../pages/Login.jsx';
 import Register from '../pages/Register.jsx';
 import Channel from '../pages/Channel.jsx';
 import Upload from '../pages/Upload.jsx';
+import { Profile } from '../pages/Profile.jsx';
 // Protected wrapper
 import ProtectedRoute from './ProtectedRouter.jsx';
 import AuthRedirect from './AuthRedirect.jsx';
@@ -31,6 +32,14 @@ const AppRouter = createBrowserRouter([
         ),
       },
       { path: 'channel/:username', element: <Channel /> },
+      {
+        path: 'profile',
+        element: (
+          <ProtectedRoute>
+            <Profile />
+          </ProtectedRoute>
+        ),
+      },
     ],
   },
   {

@@ -64,8 +64,8 @@ export const fetchUser = createAsyncThunk(
           // retry
           const res2 = await api.get('/users/current-user');
           return res2.data.data;
-        } catch (refreshErr) {
-          return rejectWithValue('Session expired');
+        } catch (err) {
+          return rejectWithValue(err?.response?.data?.message || 'Session expired');
         }
       }
       return rejectWithValue('Unauthorized');
