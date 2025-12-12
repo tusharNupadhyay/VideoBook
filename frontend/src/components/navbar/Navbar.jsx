@@ -1,18 +1,32 @@
 import { useAppSelector, useAppDispatch } from '../../app/hooks.js';
 import { logoutUser } from '../../features/auth/authActions.js';
 import { useNavigate } from 'react-router-dom';
+import { fetchChannelStats } from '../../features/user/userActions.js';
+import { resetUserState } from '../../features/user/userSlice.js';
+import {
+  logout,
+  clearError,
+  clearSuccess,
+} from '../../features/auth/authSlice.js';
 
 export default function Navbar() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const { userInfo } = useAppSelector((state) => state.auth);
+  const getChannelStats = async () => {
+    await dispatch(fetchChannelStats());
+
+    navigate('/profile');
+  };
   const handleLogout = async () => {
     try {
-      await dispatch(logoutUser()).unwrap();
+      await dispatch(logoutUser()).unwrap(); //logout from backend
       //unwrap() turns the thunk action into a real Promise
       //If the thunk succeeds → returns the actual payload (not the whole action)
       //If the thunk fails → it throws an error that we can catch in try/catch
       //This makes error handling and success flows much cleaner.
+      dispatch(logout()); //clears auth slice
+      dispatch(resetUserState()); //clear user stats slice
       navigate('/');
     } catch (err) {
       console.log('Logout failed:', err);
@@ -44,10 +58,7 @@ export default function Navbar() {
           </button>
 
           <button
-            onClick={() => {
-              console.log(userInfo);
-              navigate('/profile');
-            }}
+            onClick={getChannelStats}
             className="px-4 py-2 bg-blue-600 text-white rounded-4xl hover:bg-blue-800"
           >
             Profile
@@ -57,14 +68,22 @@ export default function Navbar() {
         // If user is NOT logged in
         <div className="flex gap-4">
           <button
-            onClick={() => navigate('/auth/login')}
+            onClick={() => {
+              dispatch(clearError());
+              dispatch(clearSuccess());
+              navigate('/auth/login');
+            }}
             className="px-4 py-2 bg-blue-600 text-white rounded-4xl transition hover:bg-blue-800"
           >
             Login
           </button>
 
           <button
-            onClick={() => navigate('/auth/register')}
+            onClick={() => {
+              dispatch(clearError());
+              dispatch(clearSuccess());
+              navigate('/auth/register');
+            }}
             className="px-4 py-2 bg-blue-600 text-white rounded-4xl hover:bg-blue-800"
           >
             Register

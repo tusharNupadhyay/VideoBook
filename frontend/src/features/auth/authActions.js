@@ -1,6 +1,8 @@
 import api from '../../lib/axios';
 import { createAsyncThunk } from '@reduxjs/toolkit';
 
+
+
 //createAsyncThunk create 3 lifecycle actions: pending,fullfilled,rejected
 export const registerUser = createAsyncThunk(
   'auth/register',
@@ -21,12 +23,13 @@ export const registerUser = createAsyncThunk(
 
 export const loginUser = createAsyncThunk(
   'auth/login',
-  async (userInfo, { rejectWithValue }) => {
+  async (userInfo, {dispatch, rejectWithValue }) => {
+
     try {
-      const res = await api.post('/users/login', userInfo);
-      console.log(res.data?.message || 'login Successfully');
-      console.log(res.data);
-      return res.data.data;
+       await api.post('/users/login', userInfo); //sets the http cookies,session info,attaches auth tokens to browser,logs login attemp on backend
+       const result = await dispatch(fetchUser()).unwrap(); // fetches current user details
+      console.log(result || 'login Successfully');
+      return result;
     } catch (error) {
       if (error.response && error.response.data.message)
         return rejectWithValue(error.response.data.message);

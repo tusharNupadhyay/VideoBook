@@ -16,6 +16,7 @@ const authSlice = createSlice({
       state.userInfo = null;
       state.success = false;
       state.error = null;
+      state.loading =false;
     },
     clearError(state) {
       state.error = null;
