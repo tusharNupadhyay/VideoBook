@@ -39,7 +39,12 @@ export default function Register() {
     if (data?.coverImage?.[0]) {
       formData.append('coverImage', data.coverImage[0]);
     }
-    dispatch(registerUser(formData));
+    try {
+      const result = await dispatch(registerUser(formData)).unwrap();
+      console.log("Registration successfull: ",result);
+    } catch (error) {
+      console.log("Registration Error: ",error)
+    }
   };
 
   const registerOptions = {
@@ -67,8 +72,8 @@ export default function Register() {
         onSubmit={handleSubmit(onSubmit)}
         className="flex flex-col space-y-4 max-w-md w-full"
       >
-        {errors.name && (
-          <small className="text-red-500 mb-0 ">{errors.name.message}</small>
+        {errors.fullName && (
+          <small className="text-red-500 mb-0 ">{errors.fullName.message}</small>
         )}
         <input
           type="text"

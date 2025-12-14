@@ -94,54 +94,8 @@ const getAllVideos = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, result, "All videos fetched successfully"));
 });
 
-const addView = asyncHandler(async (req, res) => {
-  //add a view and add to the user's watch history if user is registered
-  const { videoId } = req.params;
-  validateVideoId(videoId);
-  const userId = req.user?._id;
-  if (!userId) throw new ApiError(401, "user must be logged in");
-
-  const updatedView = await Video.findByIdAndUpdate(
-    videoId,
-    //adds  userId to view array if it is already not present
-    {
-      $addToSet: {
-        views: userId,
-      },
-    },
-    {
-      //return updated document
-      new: true,
-    }
-  );
-  if (!updatedView) throw new ApiError(404, "Video not found");
-
-  await User.findByIdAndUpdate(userId, {
-    //remove the video if it already exists in watch history (ignores if it doesn't)so that we can add it to front
-    $pull: { watchHistory: videoId },
-    $push: {
-      watchHistory: {
-        //each is push multiple items at once , push can only push one item , so if you want to use postion then you have to use $each
-        $each: [videoId],
-        $position: 0,
-      },
-    },
-  });
-
-  return res
-    .status(200)
-    .json(
-      new ApiResponse(
-        200,
-        { viewCount: updatedView.views.length },
-        "View added successfully"
-      )
-    );
-});
-
 const getAllUserVideos = asyncHandler(async (req, res) => {
-  const { userId } = req.params;
-  validateVideoId(userId);
+  const userId = validateVideoId(req.params.userId);
   const videos = await Video.find({ owner: userId })
     .select("title thumbnail description duration isPublished createdAt views")
     .sort({ createdAt: -1 });
@@ -159,8 +113,7 @@ const getAllUserVideos = asyncHandler(async (req, res) => {
 });
 const publishVideo = asyncHandler(async (req, res) => {
   const { title, description } = req.body;
-  const userId = req.user?._id;
-  validateVideoId(userId);
+  const userId = validateVideoId(req.user?._id);
   if (!title?.trim()) throw new ApiError(400, "Title is required");
   //thumbnail and videofile will come from multer
   //take the filepath and send it to cloudinary
@@ -194,53 +147,60 @@ const publishVideo = asyncHandler(async (req, res) => {
     .json(new ApiResponse(201, uploadedVideo, "Video uploaded successfully"));
 });
 const getVideoById = asyncHandler(async (req, res) => {
-  const { videoId } = req.params;
-  validateVideoId(videoId);
+  const videoId = validateVideoId(req.params.videoId);
+  const userId = validateVideoId(req.user?._id);
   //also has to lookup for likes and comments
   //To add a view after getVideoById function, either frontend will have to call addView function, Or erase that function and write add a view method here
-  const video = await Video.aggregate([
-    { $match: { _id: new mongoose.Types.ObjectId(videoId) } },
-    {
-      $lookup: {
-        from: "users",
-        localField: "owner",
-        foreignField: "_id",
-        as: "ownerDetails",
-      },
-    },
-    {
-      $unwind: "$ownerDetails",
-    },
-    {
-      $project: {
-        title: 1,
-        description: 1,
-        thumbnail: 1,
-        videoFile: 1,
-        duration: 1,
-        createdAt: 1,
-        updatedAt: 1,
-        viewCount: {
-          $size: { $ifNull: ["$views", []] },
-        },
-        ownerDetails: {
-          _id: 1,
-          username: 1,
-          avatar: 1,
+  if (userId) {
+    await Video.findByIdAndUpdate(
+      videoId,
+      //adds  userId to view array if it is already not present
+      {
+        $addToSet: {
+          views: userId,
         },
       },
-    },
-  ]);
+      {
+        //return updated document
+        new: true,
+      }
+    );
+    //mongodb does not allow push and pull on the same field in one query so query it twice
+    // Remove if already exists
+    await User.findByIdAndUpdate(userId, {
+      $pull: { watchHistory: videoId },
+    });
+
+    // Push to front
+    await User.findByIdAndUpdate(userId, {
+      $push: {
+        watchHistory: {
+          $each: [videoId],
+          $position: 0,
+        },
+      },
+    });
+  }
+  const video = await Video.findById(videoId).populate(
+    "owner",
+    "username avatar"
+  );
   if (!video || video.length === 0) throw new ApiError(404, "Video not found");
+
+  const viewCount = video.views?.length || 0;
   return res
     .status(200)
-    .json(new ApiResponse(200, video[0], "Video fetched successfully"));
+    .json(
+      new ApiResponse(
+        200,
+        { ...video.toObject(), viewCount },
+        "Video fetched successfully"
+      )
+    );
 });
 const updateVideoDetails = asyncHandler(async (req, res) => {
-  const { videoId } = req.params;
-  validateVideoId(videoId);
-  const userId = req.user?._id;
-  validateVideoId(userId);
+  const videoId = validateVideoId(req.params.videoId);
+  const userId = validateVideoId(req.user?._id);
   //update video details like title, description, thumbnail
   const { title, description } = req.body;
   const thumbnailLocalPath = req.file?.path;
@@ -281,10 +241,9 @@ const updateVideoDetails = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, video, "Video Details updated successfully"));
 });
 const deleteVideo = asyncHandler(async (req, res) => {
-  const { videoId } = req.params;
-  validateVideoId(videoId);
-  const userId = req.user._id;
-  if (!userId) throw new ApiError(401, "Unauthorized: Login required");
+  const videoId = validateVideoId(req.params.videoId);
+  const userId = validateVideoId(req.user?._id);
+
   //fetch the video from DB
   const video = await Video.findById(videoId);
   if (!video) throw new ApiError(404, "Video not found");
@@ -304,10 +263,8 @@ const deleteVideo = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, {}, "Video deleted successfully"));
 });
 const togglePublishStatus = asyncHandler(async (req, res) => {
-  const { videoId } = req.params;
-  validateVideoId(videoId);
-  const userId = req.user?._id;
-  if (!userId) throw new ApiError(401, "Unauthorized: Login required");
+  const videoId = validateVideoId(req.params.videoId);
+  const userId = validateVideoId(req.user?._id);
 
   //use findByIdandupdate when you only search using id , use findbyoneandupdate when you want to match by more fields like owner
   const video = await Video.findOneAndUpdate(
@@ -335,7 +292,6 @@ const togglePublishStatus = asyncHandler(async (req, res) => {
 });
 export {
   getAllVideos,
-  addView,
   getAllUserVideos,
   publishVideo,
   getVideoById,

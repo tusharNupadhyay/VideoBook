@@ -1,8 +1,7 @@
 import { Router } from "express";
 import { upload } from "../middlewares/multer.middleware.js";
-import { verifyJWT } from "../middlewares/auth.middleware.js";
+import { verifyJWT,optionalVerifyJwt } from "../middlewares/auth.middleware.js";
 import {
-  addView,
   deleteVideo,
   getAllUserVideos,
   getAllVideos,
@@ -31,12 +30,10 @@ router.route("/user/:userId").get(getAllUserVideos);
 // single video operations
 router
   .route("/:videoId")
-  .get(getVideoById) //public
+  .get(optionalVerifyJwt,getVideoById) //public
   .delete(verifyJWT, deleteVideo) //protected
   .patch(verifyJWT, upload.single("thumbnail"), updateVideoDetails); //protected
 
 //for special actions like toggle publish status special endpoints should be used
 router.route("/toggle/publish/:videoId").patch(verifyJWT, togglePublishStatus);
-//adding a view
-router.route("/:videoId/views").patch(verifyJWT, addView);
 export default router;

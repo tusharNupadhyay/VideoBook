@@ -1,7 +1,6 @@
 import { useAppSelector, useAppDispatch } from '../../app/hooks.js';
 import { logoutUser } from '../../features/auth/authActions.js';
 import { useNavigate } from 'react-router-dom';
-import { fetchChannelStats } from '../../features/user/userActions.js';
 import { resetUserState } from '../../features/user/userSlice.js';
 import {
   logout,
@@ -13,11 +12,6 @@ export default function Navbar() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const { userInfo } = useAppSelector((state) => state.auth);
-  const getChannelStats = async () => {
-    await dispatch(fetchChannelStats());
-
-    navigate('/profile');
-  };
   const handleLogout = async () => {
     try {
       await dispatch(logoutUser()).unwrap(); //logout from backend
@@ -58,11 +52,17 @@ export default function Navbar() {
           </button>
 
           <button
-            onClick={getChannelStats}
+            onClick={() => {
+              navigate('/profile');
+            }}
             className="px-4 py-2 bg-blue-600 text-white rounded-4xl hover:bg-blue-800"
           >
             Profile
           </button>
+          <button className='px-4 py-2 bg-blue-600 text-white rounded-4xl hover:bg-blue-800' 
+          onClick={() => {
+            navigate('/upload');
+          }}>Upload</button>
         </div>
       ) : (
         // If user is NOT logged in

@@ -72,6 +72,7 @@ const getChannelStats = asyncHandler(async (req, res) => {
               channelsSubscribedTo: 1,
               totalTweets: 1,
               tweets: 1,
+              coverImage:1,
             },
           },
         ],
@@ -92,7 +93,7 @@ const getChannelStats = asyncHandler(async (req, res) => {
                     viewCount: {
                       $size: { $ifNull: ["$views", []] },
                     },
-                    videoFile: 1,
+                    //videoFile: 1,
                     isPublished: 1,
                   },
                 },
