@@ -71,8 +71,7 @@ const getChannelStats = asyncHandler(async (req, res) => {
               totalSubs: 1,
               channelsSubscribedTo: 1,
               totalTweets: 1,
-              tweets: 1,
-              coverImage:1,
+              coverImage: 1,
             },
           },
         ],
@@ -84,6 +83,9 @@ const getChannelStats = asyncHandler(async (req, res) => {
               foreignField: "owner",
               as: "videoArray",
               pipeline: [
+                {
+                  $match: { isPublished: true }, //fetch only published videos
+                },
                 {
                   $project: {
                     thumbnail: 1,
@@ -141,7 +143,12 @@ const getChannelStats = asyncHandler(async (req, res) => {
               pipeline: [
                 {
                   $match: {
-                    $expr: { $in: ["$video", "$$vids"] }, //video is from like document
+                    $expr: {
+                      $and: [
+                        { $in: ["$video", "$$vids"] }, //video is from like document
+                        { $eq: ["$value", 1] }, // ONLY likes
+                      ],
+                    },
                   },
                 },
               ],
@@ -166,25 +173,30 @@ const getChannelStats = asyncHandler(async (req, res) => {
               from: "playlists",
               localField: "_id",
               foreignField: "owner",
-              pipeline: [
-                {
-                  $lookup: {
-                    from: "videos",
-                    localField: "videos",
-                    foreignField: "_id",
-                    as: "videoArray",
-                  },
-                },
-              ],
               as: "playlistArray",
             },
           },
           {
+            $addFields: {
+              totalPlaylists: { $size: "$playlistArray" },
+              totalPlaylistVideos: {
+                $sum: {
+                  $map: {  //loop over playlistArray
+                    input: "$playlistArray",
+                    as: "pl",
+                    in: { $size: { $ifNull: ["$$pl.videos", []] } }, //$ifNull is safety check, it treats missing/null as empty array[]
+                  },
+                },
+              },
+            },
+          },
+          {
             $project: {
-                _id: 0,
-                playlistArray: 1
-            }
-          }
+              _id: 0,
+              totalPlaylists: 1,
+              totalPlaylistVideos: 1
+            },
+          },
         ],
       },
     },
@@ -242,4 +254,4 @@ const getChannelVideos = asyncHandler(async (req, res) => {
     );
 });
 
-export {getChannelStats,getChannelVideos}
+export { getChannelStats, getChannelVideos };

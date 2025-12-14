@@ -8,6 +8,7 @@ import {
 } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import mongoose from "mongoose";
+import { Like } from "../models/like.model.js";
 
 const validateVideoId = (id) => {
   if (!id) throw new ApiError(400, "Id is missing");
@@ -148,7 +149,7 @@ const publishVideo = asyncHandler(async (req, res) => {
 });
 const getVideoById = asyncHandler(async (req, res) => {
   const videoId = validateVideoId(req.params.videoId);
-  const userId = validateVideoId(req.user?._id);
+  const userId = req.user?._id ? validateVideoId(req.user._id) : null;
   //also has to lookup for likes and comments
   //To add a view after getVideoById function, either frontend will have to call addView function, Or erase that function and write add a view method here
   if (userId) {
@@ -290,6 +291,7 @@ const togglePublishStatus = asyncHandler(async (req, res) => {
       )
     );
 });
+
 export {
   getAllVideos,
   getAllUserVideos,

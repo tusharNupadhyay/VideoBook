@@ -36,3 +36,30 @@ export const fetchAllVideos = createAsyncThunk('video/fetchAllVideos',
     }
   }
 )
+
+export const toggleVideoReaction = createAsyncThunk('video/toggleReaction',
+  async({videoId,value},{rejectWithValue}) => {
+    try {
+      const res = await api.post(`/likes/videos/${videoId}/reaction`,{value});
+      return res.data.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.message || "Failed to toggle reaction"
+      );
+    }
+  }
+)
+
+export const getVideoReactions = createAsyncThunk(
+  "video/getVideoReactions",
+  async (videoId, { rejectWithValue }) => {
+    try {
+      const res = await api.get(`/likes/videos/${videoId}/reactions`);
+      return res.data.data; // { likes, dislikes, userReaction }
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to fetch reactions"
+      );
+    }
+  }
+);
