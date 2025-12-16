@@ -220,38 +220,4 @@ const getChannelStats = asyncHandler(async (req, res) => {
     );
 });
 
-const getChannelVideos = asyncHandler(async (req, res) => {
-  // Get all the videos uploaded by the channel
-  const userId = validateId(req.user?._id);
-  const channelVideos = await Video.aggregate([
-    {
-      $match: { owner: userId },
-    },
-    {
-      $project: {
-        title: 1,
-        thumbnail: 1,
-        description: 1,
-        duration: 1,
-        isPublished: 1,
-        createdAt: 1,
-
-        viewCount: { $size: { $ifNull: ["$views", []] } },
-      },
-    },
-    {
-      $sort: { createdAt: -1 },
-    },
-  ]);
-  return res
-    .status(200)
-    .json(
-      new ApiResponse(
-        200,
-        channelVideos,
-        "All Channel Videos fetched successfully"
-      )
-    );
-});
-
-export { getChannelStats, getChannelVideos };
+export { getChannelStats };

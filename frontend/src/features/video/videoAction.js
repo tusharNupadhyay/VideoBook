@@ -12,19 +12,20 @@ export const uploadVideo = createAsyncThunk(
       return rejectWithValue(error.response?.data?.message || 'Upload failed');
     }
   }
-);
+)
 
+//fetches a video and add to user's watch history and increment a view if user is logged in 
 export const fetchVideoById = createAsyncThunk('video/fetchVideoById',
     async(videoId,{rejectWithValue}) => {
         try {
-          const res = await api.get(`/videos/${videoId}`);
+          const res = await api.get(`/videos/id/${videoId}`);
           return res.data.data;
         } catch (error) {
           return rejectWithValue(error.response?.data?.message || 'Cannot fetch video');
         }
     }
 )
-
+//fetches all videos for homepage
 export const fetchAllVideos = createAsyncThunk('video/fetchAllVideos',
   async(_,{rejectWithValue}) => {
     try {
@@ -37,6 +38,7 @@ export const fetchAllVideos = createAsyncThunk('video/fetchAllVideos',
   }
 )
 
+//toggle like and dislike
 export const toggleVideoReaction = createAsyncThunk('video/toggleReaction',
   async({videoId,value},{rejectWithValue}) => {
     try {
@@ -50,6 +52,7 @@ export const toggleVideoReaction = createAsyncThunk('video/toggleReaction',
   }
 )
 
+//get likes and dislikes for a video
 export const getVideoReactions = createAsyncThunk(
   "video/getVideoReactions",
   async (videoId, { rejectWithValue }) => {
@@ -63,3 +66,24 @@ export const getVideoReactions = createAsyncThunk(
     }
   }
 );
+
+//fetch channel videos throught username (PUBLIC)
+export const getChannelVideos = createAsyncThunk("video/getChannelVideos", async(username,{rejectWithValue})=>{
+    try {
+      const res = await api.get(`/videos/channel/${username}`);
+      console.log(res.data.data);
+      return res.data.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || "Failed to fetch Channel Videos");
+    }
+});
+
+//fetch my videos throught userId (PRIVATE)
+export const getMyVideos = createAsyncThunk("video/getMyVideos", async(_,{rejectWithValue})=>{
+  try {
+      const res = await api.get('/videos/my-videos');
+      return res.data.data;
+  } catch (error) {
+    return rejectWithValue(error.response?.data?.message || "Failed to fetch your Videos");
+  }
+})

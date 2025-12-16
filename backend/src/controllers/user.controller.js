@@ -9,6 +9,13 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
 
+const validateId = (id) => {
+  if (!id) throw new ApiError(400, "Id is missing");
+  if (!mongoose.Types.ObjectId.isValid(id))
+    throw new ApiError(400, "Invalid ID");
+  return new mongoose.Types.ObjectId(id);
+};
+
 const registerUser = asyncHandler(async (req, res) => {
   //get user details from frontend (using postman)
   //validate (not empty)
@@ -276,79 +283,7 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
     .status(200)
     .json(new ApiResponse(200, user, "cover image updated successfully"));
 });
-const getUserChannelProfile = asyncHandler(async (req, res) => {
-  const { username } = req.params;
-  if (!username?.trim()) throw new ApiError(400, "username is missing");
-  const channel = await User.aggregate([
-    {
-      $match: {
-        username: username?.trim().toLowerCase(), //user get's matched
-      },
-    },
-    {
-      //matches localField from the User document with foreignField from each Subscriptions document.
-      $lookup: {
-        from: "subscriptions", //Name of the other collection you want to join with(Subscriptions collection)
-        localField: "_id", //Field from the current document in the pipeline (user's _id selected after $match)
-        foreignField: "channel", //Field inside the other collection (Subscriptions)
-        as: "subscribers",
-      },
-    },
-    {
-      //count how many channels have you subscribed
-      $lookup: {
-        from: "subscriptions",
-        localField: "_id",
-        foreignField: "subscriber",
-        as: "subscribedTo",
-      },
-    },
-    {
-      //these additional fields will be added to existing user's document
-      $addFields: {
-        subscribersCount: {
-          $size: "$subscribers", //to count subscribers field document
-        },
-        channelsSubscribedToCount: {
-          $size: "$subscribedTo", //to count how many channels you have subscribed to
-        },
-        isSubscribed: {
-          //whenever you visit any channel, this will return true if you are subscribed to that channel and false if you are not
-          $cond: {
-            // So "subscriber" is a field inside each object of the "subscribers" array.When we use "$subscribers.subscriber", MongoDB automatically extracts all subscriber IDs into an array
-            // $in checks if the logged-in user's ID (req.user?._id) is present inside that extracted array.
-            if: { $in: [req.user?._id, "$subscribers.subscriber"] },
-            then: true,
-            else: false,
-          },
-        },
-      },
-    },
-    {
-      //filters out unnecessary data and return only what is necessary for user's channel profile
-      $project: {
-        fullName: 1,
-        username: 1,
-        email: 1,
-        avatar: 1,
-        coverImage: 1,
-        subscribersCount: 1,
-        channelsSubscribedToCount: 1,
-        isSubscribed: 1,
-      },
-    },
-  ]);
-  if (!channel?.length) throw new ApiError(404, "channel does not exist");
-  return res
-    .status(200)
-    .json(
-      new ApiResponse(
-        200,
-        channel[0],
-        "User channel profile fetched successfully"
-      )
-    );
-});
+
 const getWatchHistory = asyncHandler(async (req, res) => {
   //the id that we get from database is a string but by using mongoose queries , it automatically converts it to mongodb object id
   //but mongoose doesn't work on aggregattion pipelines , it directly goes to mongodb
@@ -412,6 +347,198 @@ const getWatchHistory = asyncHandler(async (req, res) => {
     )
   );
 });
+
+//helper base pipeline arrow function that implicit returns an array (without return)
+const buildChannelProfilePipeline = (userId) => [
+  {
+    $match: { _id: userId },
+  },
+  {
+    //get total subscribers of channel
+    $lookup: {
+      from: "subscribers",
+      let: { channelId: "$_id" },
+      as: "subscriberCount",
+      pipeline: [
+        {
+          $match: {
+            $expr: { $eq: ["$channel", "$$channelId"] },
+          },
+        },
+        { $count: "count" },
+      ],
+    },
+  },
+
+  {
+    //get total number of tweets of channel
+    $lookup: {
+      from: "tweets",
+      let: { userId: "$_id" },
+      as: "totalTweets",
+      pipeline: [
+        {
+          $match: {
+            $expr: { $eq: ["$owner", "$$userId"] },
+          },
+        },
+        { $count: "count" },
+      ],
+    },
+  },
+];
+
+//Public method to get channel profile through username
+const getChannelProfile = asyncHandler(async (req, res) => {
+  const username = req.params.username?.trim()?.toLowerCase();
+  if (!username) throw new ApiError(400, "username is missing");
+
+  const userId = req.user?._id ? validateId(req.user._id) : null;
+
+  //find _id of channel first because it will be used to match subscriber field to user,since subscriber field is a ref to user id
+  const channel = await User.findOne({ username }).select("_id");
+
+  if (!channel) throw new ApiError(404, "Channel does not exists");
+
+  const pipeline = [...buildChannelProfilePipeline(channel._id)];
+
+  if (userId) {
+    pipeline.push(
+      {
+        $lookup: {
+          from: "subscribers",
+          let: {
+            channelId: "$_id", //_id is from current document (outer collection)
+            userId: userId,
+          },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ["$channel", "$$channelId"] },
+                    { $eq: ["$subscriber", "$$userId"] },
+                  ],
+                },
+              },
+            },
+            { $limit: 1 }, //stops matching as soon as one document is there
+          ],
+          as: "subscriptionCheck",
+        },
+      },
+      {
+        $addFields: {
+          isSubscribed: {
+            $ne: ["$subscriptionCheck", []],
+          },
+        },
+      }
+    );
+  }
+
+  //build project dynamically using javascript so you can use if condition on userId to include isSubscribed flag if user is logged in
+  const projectStage = {
+    $project: {
+      username: 1,
+      createdAt: 1,
+      avatar: 1,
+      coverImage: 1, //mongodb returns null if field is missing
+      totalSubscribers: {
+        $ifNull: [{ $arrayElemAt: ["$subscriberCount.count", 0] }, 0],
+      },
+      totalTweets: {
+        $ifNull: [{ $arrayElemAt: ["$totalTweets.count", 0] }, 0],
+      },
+    },
+  };
+  if (userId) {
+    projectStage.$project.isSubscribed = 1; //only include isSubscribed flag if user is logged in
+  }
+
+  pipeline.push(projectStage);
+
+  const result = await User.aggregate(pipeline);
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, result[0], "channel profile fetched successfully")
+    );
+});
+
+//Private method call my Channel Profile through userId
+const getMyProfile = asyncHandler(async (req, res) => {
+  const userId = validateId(req.user._id);
+  const pipeline = [...buildChannelProfilePipeline(userId)];
+
+  // get channels that you are subscribed to with their username and avatar
+  pipeline.push(
+    {
+      $lookup: {
+        from: "subscribers",
+        let: { userId: "$_id" },
+        as: "subscribedChannels",
+        pipeline: [
+          {
+            $match: {
+              $expr: { $eq: ["$subscriber", "$$userId"] },
+            },
+          },
+          {
+            $lookup: {
+              from: "users",
+              localField: "channel",
+              foreignField: "_id",
+              as: "channelInfo",
+            },
+          },
+
+          {
+            $unwind: "$channelInfo",
+          },
+          {
+            $project: {
+              _id: 0,
+              username: "$channelInfo.username",
+              avatar: "$channelInfo.avatar",
+            },
+          },
+        ],
+      },
+    },
+    {
+      $addFields: {
+        totalSubscribedChannels: { $size: "$subscribedChannels" },
+      },
+    },
+    {
+      $project: {
+        username: 1,
+        email: 1,
+        createdAt: 1,
+        avatar: 1,
+        fullName: 1,
+        coverImage: 1,
+        totalSubscribers: {
+          $ifNull: [{ $arrayElemAt: ["$subscriberCount.count", 0] }, 0],
+        },
+        totalTweets: {
+          $ifNull: [{ $arrayElemAt: ["$totalTweets.count", 0] }, 0],
+        },
+        subscribedChannels: 1,
+        totalSubscribedChannels: 1,
+      },
+    }
+  );
+  const result = await User.aggregate(pipeline);
+  if (!result.length) {
+    throw new ApiError(404, "Profile not found");
+  }
+  return res
+    .status(200)
+    .json(new ApiResponse(200, result[0], "Your profile fetched successfully"));
+});
+
 export {
   registerUser,
   loginUser,
@@ -422,6 +549,7 @@ export {
   updateAccountDetails,
   updateUserAvatar,
   updateUserCoverImage,
-  getUserChannelProfile,
+  getChannelProfile,
   getWatchHistory,
+  getMyProfile,
 };

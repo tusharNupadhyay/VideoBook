@@ -9,6 +9,8 @@ import {
   publishVideo,
   togglePublishStatus,
   updateVideoDetails,
+  getChannelVideos,
+  getMyVideos
 } from "../controllers/video.controller.js";
 
 const router = Router();
@@ -25,15 +27,24 @@ router
     ]),
     publishVideo
   );
+
+  router.get("/my-videos",verifyJWT,getMyVideos); //private 
+
 //get all videos of a user (public)
-router.route("/user/:userId").get(getAllUserVideos);
+router.route("/user/:userId").get(getAllUserVideos); // without pagination
+router.get("/channel/:username",getChannelVideos); // same as above but instead passes username as params and uses pagination
 // single video operations
+
+//for special actions like toggle publish status special endpoints should be used
+router.route("/toggle/publish/:videoId").patch(verifyJWT, togglePublishStatus);
+
 router
-  .route("/:videoId")
+  .route("/id/:videoId")
   .get(optionalVerifyJwt,getVideoById) //public
   .delete(verifyJWT, deleteVideo) //protected
   .patch(verifyJWT, upload.single("thumbnail"), updateVideoDetails); //protected
 
-//for special actions like toggle publish status special endpoints should be used
-router.route("/toggle/publish/:videoId").patch(verifyJWT, togglePublishStatus);
+
+
+
 export default router;

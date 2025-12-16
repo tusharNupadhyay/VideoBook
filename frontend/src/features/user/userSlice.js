@@ -1,40 +1,66 @@
 import { createSlice } from '@reduxjs/toolkit';
-import { fetchChannelStats } from './userActions';
+import {
+  getChannelProfile,
+  getMyProfile,
+} from './userActions';
 
 const initialState = {
-  stats: null,
-  loading: false,
-  error: null,
+  // PUBLIC CHANNEL PROFILE (by username)
+  channelProfile: null,
+  channelLoading: false,
+  channelError: null,
+
+  // PRIVATE PROFILE (logged-in user)
+  myProfile: null,
+  myProfileLoading: false,
+  myProfileError: null,
 };
 
 const userSlice = createSlice({
   name: 'user',
   initialState,
   reducers: {
-    resetUserState: (state) => {
-      state.stats = null;
-      state.loading = false;
-      state.error = null;
+    resetChannelProfile: (state) => {
+      state.channelProfile = null;
+      state.channelLoading = false;
+      state.channelError = null;
+    },
+    resetMyProfile: (state) => {
+      state.myProfile = null;
+      state.myProfileLoading = false;
+      state.myProfileError = null;
     },
   },
   extraReducers: (builder) => {
     builder
-      //Fetch Channel Stats
-      .addCase(fetchChannelStats.pending, (state) => {
-        state.loading = true;
+      //Fetch Public channel
+      .addCase(getChannelProfile.pending, (state) => {
+        state.channelLoading = true;
+        state.channelError = null;
       })
-      .addCase(fetchChannelStats.fulfilled, (state, action) => {
-        state.stats = action.payload;
-        state.loading = false;
-        state.error = null;
+      .addCase(getChannelProfile.fulfilled, (state, action) => {
+        state.channelLoading = false;
+        state.channelProfile = action.payload;
       })
-      .addCase(fetchChannelStats.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload || action.error.message;
-        state.stats = null;
+      .addCase(getChannelProfile.rejected, (state, action) => {
+        state.channelLoading = false;
+        state.channelError = action.payload || action.error.message;
+      })
+      // MY PROFILE
+      .addCase(getMyProfile.pending, (state) => {
+        state.myProfileLoading = true;
+        state.myProfileError = null;
+      })
+      .addCase(getMyProfile.fulfilled, (state, action) => {
+        state.myProfileLoading = false;
+        state.myProfile = action.payload;
+      })
+      .addCase(getMyProfile.rejected, (state, action) => {
+        state.myProfileLoading = false; 
+        state.myProfileError = action.payload;
       });
   },
 });
 
 export default userSlice.reducer;
-export const { resetUserState } = userSlice.actions;
+export const { resetChannelProfile,resetMyProfile } = userSlice.actions;

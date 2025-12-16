@@ -6,12 +6,14 @@ import router from './router/AppRouter';
 
 const App = () => {
   const dispatch = useAppDispatch();
-  const { loading } = useAppSelector((state) => state.auth);
+  const { initialized} = useAppSelector((state) => state.auth);
+
   useEffect(() => {
     dispatch(fetchUser());
   }, [ dispatch]);
-  if (loading) return <div>Loading...</div>;
-  return <RouterProvider router={router} />;
+  if (!initialized) return <div className='text-2xl text-black'>checking session...</div>;
+
+  return <RouterProvider router={router} />; //router remounting ignores auth status completely, since react router cannot preserve navigation state if it's unmounted so do not conditionally return router
 };
 
 export default App;

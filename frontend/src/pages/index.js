@@ -8,7 +8,9 @@ import Register from "./Register";
 import Tweets from "./Tweets";
 import Upload from "./Upload";
 import Watch from "./Watch";
+import MyVideos from "./MyVideos";
+import EditPage from "./EditPage";
 
 export{Channel,ErrorPage,Home,Login,Playlist,Profile,Register,Tweets,Upload,
-    Watch
+    Watch,MyVideos,EditPage
 }

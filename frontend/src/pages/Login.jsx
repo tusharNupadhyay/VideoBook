@@ -2,7 +2,6 @@ import { useForm } from 'react-hook-form';
 import { useAppSelector, useAppDispatch } from '../app/hooks.js';
 import { loginUser } from '../features/auth/authActions.js';
 import { useNavigate } from 'react-router-dom';
-import { useEffect } from 'react';
 import {
   clearError,
   clearSuccess,
@@ -14,25 +13,24 @@ export default function Login() {
     handleSubmit,
     formState: { errors },
   } = useForm();
-  const { loading, success, error } = useAppSelector((state) => state.auth);
+  const { loading, error } = useAppSelector((state) => state.auth);
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (success) {
-      navigate('/');
+  const onSubmit = async (data) => {
+    try {
+      const userInfo = {
+        identifier: data.identifier,
+        password: data.password,
+      };
+  
+      await dispatch(loginUser(userInfo)).unwrap();
       dispatch(clearSuccess());
       dispatch(clearError());
+      navigate('/');
+    } catch (error) {
+      console.log("Login Error: ",error);
     }
-  }, [navigate, success, dispatch]);
-
-  const onSubmit = async (data) => {
-    const userInfo = {
-      identifier: data.identifier,
-      password: data.password,
-    };
-
-    dispatch(loginUser(userInfo));
   };
 
   return (

@@ -1,8 +1,6 @@
 import api from '../../lib/axios';
 import { createAsyncThunk } from '@reduxjs/toolkit';
 
-
-
 //createAsyncThunk create 3 lifecycle actions: pending,fullfilled,rejected
 export const registerUser = createAsyncThunk(
   'auth/register',
@@ -23,11 +21,10 @@ export const registerUser = createAsyncThunk(
 
 export const loginUser = createAsyncThunk(
   'auth/login',
-  async (userInfo, {dispatch, rejectWithValue }) => {
-
+  async (userInfo, { dispatch, rejectWithValue }) => {
     try {
-       await api.post('/users/login', userInfo); //sets the http cookies,session info,attaches auth tokens to browser,logs login attemp on backend
-       const result = await dispatch(fetchUser()).unwrap(); // fetches current user details
+      await api.post('/users/login', userInfo); //sets the http cookies,session info,attaches auth tokens to browser,logs login attemp on backend
+      const result = await dispatch(fetchUser()).unwrap(); // fetches current user details
       console.log(result || 'login Successfully');
       return result;
     } catch (error) {
@@ -59,6 +56,13 @@ export const fetchUser = createAsyncThunk(
       const res = await api.get('/users/current-user');
       return res.data.data;
     } catch (error) {
+      if (!error.response) {
+        return rejectWithValue('Network error');
+      }
+      // if Not logged in then silent fail
+      if (error.response?.status === 401) {
+        return null;
+      }
       //access token expired so send request to generate new refresh token
       if (error.response?.data?.message === 'TokenExpired') {
         try {
@@ -68,7 +72,9 @@ export const fetchUser = createAsyncThunk(
           const res2 = await api.get('/users/current-user');
           return res2.data.data;
         } catch (err) {
-          return rejectWithValue(err?.response?.data?.message || 'Session expired');
+          return rejectWithValue(
+            err?.response?.data?.message || 'Session expired'
+          );
         }
       }
       return rejectWithValue('Unauthorized');

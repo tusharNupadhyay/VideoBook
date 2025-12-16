@@ -2,6 +2,7 @@ import { Outlet } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
 import { clearError, clearSuccess } from '../features/auth/authSlice';
 import { useAppDispatch } from '../app/hooks';
+
 export default function AuthLayout() {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();

@@ -2,11 +2,7 @@ import { useForm } from 'react-hook-form';
 import { useAppSelector, useAppDispatch } from '../app/hooks.js';
 import { registerUser } from '../features/auth/authActions.js';
 import { useNavigate } from 'react-router-dom';
-import { useEffect } from 'react';
-import {
-  clearError,
-  clearSuccess,
-} from '../features/auth/authSlice.js';
+import { clearError, clearSuccess } from '../features/auth/authSlice.js';
 
 export default function Register() {
   const {
@@ -16,17 +12,9 @@ export default function Register() {
   } = useForm();
 
   //error is what backend will send if login or registration failed
-  const { loading, success, error } = useAppSelector((state) => state.auth);
+  const { loading, error } = useAppSelector((state) => state.auth);
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
-
-  useEffect(() => {
-    if (success) {
-      navigate('/auth/login');
-      dispatch(clearSuccess());
-      dispatch(clearError());
-    }
-  }, [navigate, success, dispatch]);
 
   const onSubmit = async (data) => {
     const formData = new FormData(); //formData is needed for file uploads
@@ -41,9 +29,12 @@ export default function Register() {
     }
     try {
       const result = await dispatch(registerUser(formData)).unwrap();
-      console.log("Registration successfull: ",result);
+      console.log('Registration successfull: ', result);
     } catch (error) {
-      console.log("Registration Error: ",error)
+      console.log('Registration Error: ', error);
+      navigate('/auth/login'); //side effect like navigation should happen where action happens , not in the global observer like user Effect
+      dispatch(clearSuccess());
+      dispatch(clearError());
     }
   };
 
@@ -73,7 +64,9 @@ export default function Register() {
         className="flex flex-col space-y-4 max-w-md w-full"
       >
         {errors.fullName && (
-          <small className="text-red-500 mb-0 ">{errors.fullName.message}</small>
+          <small className="text-red-500 mb-0 ">
+            {errors.fullName.message}
+          </small>
         )}
         <input
           type="text"

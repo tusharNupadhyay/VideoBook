@@ -2,10 +2,12 @@ import { createSlice } from '@reduxjs/toolkit';
 import { registerUser, loginUser, logoutUser, fetchUser } from './authActions';
 
 const initialState = {
-  loading: true,
+  loading: false,
   userInfo: null,
   error: null,
-  success: false,
+  success: false,    // no need for success flag(to navigate) , since navigation after login and register happens in try catch after await dispatch
+  initialized: false // to check user's auth status with certainity
+
 };
 const authSlice = createSlice({
   name: 'auth',
@@ -38,11 +40,13 @@ const authSlice = createSlice({
         state.loading = false;
         state.error = null;
         state.success = true;
+      
         //  state.userInfo = action.payload; user info will auto log in
       })
       .addCase(registerUser.rejected, (state, action) => {
         state.loading = false;
         state.success = false;
+        
         state.error = action.payload || action.error.message;
       })
       // LOGIN BUILDER
@@ -55,16 +59,19 @@ const authSlice = createSlice({
         state.loading = false;
         state.error = null;
         state.success = true;
+        
         state.userInfo = action.payload;
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false;
         state.success = false;
+        
         state.error = action.payload || action.error.message;
       })
       //LOGOUT BUILDERS
       .addCase(logoutUser.pending, (state) => {
         state.loading = true;
+        state.error =null;
       })
       .addCase(logoutUser.fulfilled, (state) => {
         state.loading = false;
@@ -77,22 +84,22 @@ const authSlice = createSlice({
         state.error = action.payload || action.payload.message;
       })
       //FETCH USER BUILDER
+      //no need to set error for fetchUser since it is a session check api , it should silently validates auth without giving error
       .addCase(fetchUser.pending,(state) => {
         state.loading = true;
-        state.error = null;
         state.success = false;
       })
       .addCase(fetchUser.fulfilled, (state, action) => {
         state.userInfo = action.payload;
         state.success = true;
-        state.error =false;
         state.loading = false;
+        state.initialized=true;
       })
-      .addCase(fetchUser.rejected, (state,action) => {
+      .addCase(fetchUser.rejected, (state) => {
         state.userInfo = null;
         state.loading =false;
-        state.error = action.payload || action.payload.message;
         state.success =false;
+        state.initialized=true;
       });
   },
 });

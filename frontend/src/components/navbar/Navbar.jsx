@@ -1,12 +1,14 @@
 import { useAppSelector, useAppDispatch } from '../../app/hooks.js';
 import { logoutUser } from '../../features/auth/authActions.js';
 import { useNavigate } from 'react-router-dom';
-import { resetUserState } from '../../features/user/userSlice.js';
+import { resetMyProfile,resetChannelProfile } from '../../features/user/userSlice.js';
+import { resetChannelVideos,resetMyVideos,resetUploadState } from '../../features/video/videoSlice.js';
 import {
   logout,
   clearError,
   clearSuccess,
 } from '../../features/auth/authSlice.js';
+
 
 export default function Navbar() {
   const dispatch = useAppDispatch();
@@ -20,7 +22,13 @@ export default function Navbar() {
       //If the thunk fails → it throws an error that we can catch in try/catch
       //This makes error handling and success flows much cleaner.
       dispatch(logout()); //clears auth slice
-      dispatch(resetUserState()); //clear user stats slice
+
+      dispatch(resetMyProfile()); //clear user stats slice
+      dispatch(resetChannelProfile())
+
+      dispatch(resetChannelVideos());
+      dispatch(resetUploadState());
+      dispatch(resetMyVideos());
       navigate('/');
     } catch (err) {
       console.log('Logout failed:', err);

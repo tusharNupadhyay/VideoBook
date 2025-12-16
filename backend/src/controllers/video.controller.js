@@ -17,6 +17,7 @@ const validateVideoId = (id) => {
   return id;
 };
 const getAllVideos = asyncHandler(async (req, res) => {
+  // get all videos for Home Page of application
   const {
     page = 1,
     limit = 10,
@@ -75,9 +76,10 @@ const getAllVideos = asyncHandler(async (req, res) => {
         isPublished: 1,
         createdAt: 1,
         updatedAt: 1,
-        "ownerDetails.username": 1,
-        "ownerDetails.avatar": 1,
-        "ownerDetails._id": 1,
+        owner: {
+          username: "$ownerDetails.username",
+          avatar: "$ownerDetails.avatar",
+        },
       },
     },
   ];
@@ -292,6 +294,138 @@ const togglePublishStatus = asyncHandler(async (req, res) => {
     );
 });
 
+const getChannelVideos = asyncHandler(async (req, res) => {
+  //Public method to get channel videos using username params
+  const { username } = req.params;
+  //pagination
+  const page = Number(req.query.page) || 1;
+  const limit = Number(req.query.limit) || 12;
+  const skip = (page - 1) * limit;
+
+  const channel = await User.findOne({ username }).select("_id");
+  if (!channel) throw new ApiError(404, "channel not found");
+
+  const videos = await Video.aggregate([
+    {
+      $match: { owner: channel._id, isPublished: true },
+    },
+    {
+      $lookup: {
+        from: "users",
+        localField: "owner",
+        foreignField: "_id",
+        as: "ownerDetails",
+      },
+    },
+    {
+      $unwind: "$ownerDetails",
+    },
+    {
+      $facet: {
+        videos: [
+          {
+            $sort: { createdAt: -1 },
+          },
+          { $skip: skip },
+          { $limit: limit },
+          {
+            $project: {
+              title: 1,
+              thumbnail: 1,
+              isPublished: 1,
+              createdAt: 1,
+              viewCount: { $size: { $ifNull: ["$views", []] } },
+              duration: 1,
+              owner: {
+                username: "$ownerDetails.username",
+                avatar: "$ownerDetails.avatar",
+              },
+            },
+          },
+        ],
+        total: [{ $count: "count" }],
+      },
+    },
+  ]);
+  return res
+    .status(200)
+    .json(new ApiResponse(200, videos, "Channel videos fetched"));
+});
+
+const getMyVideos = asyncHandler(async (req, res) => {
+  //Private controller to fetch videos (published as well as unpublished) of only logged in user to edit details
+  if (!req.user?._id) {
+    throw new ApiError(401, "Unauthorized");
+  }
+
+  const userId = validateVideoId(req.user._id);
+
+  const page = Number(req.query.page) || 1;
+  const limit = Number(req.query.limit) || 10;
+  const skip = (page - 1) * limit;
+
+  const videos = await Video.aggregate([
+    {
+      $match: { owner: userId },
+    },
+     {
+    $lookup: {
+      from: "users",
+      localField: "owner",
+      foreignField: "_id",
+      as: "owner"
+    }
+  },
+  {
+    $unwind: "$owner"
+  },
+    {
+      $facet: {
+       videos: [
+        { $sort: { createdAt: -1 } },
+        { $skip: skip },
+        { $limit: limit },
+        {
+          $project: {
+            title: 1,
+            thumbnail: 1,
+            isPublished: 1,
+            createdAt: 1,
+            duration: 1,
+            viewCount: {
+              $size: { $ifNull: ["$views", []] }
+            }
+          }
+        }
+      ],
+       owner: [
+        {
+          $project: {
+            _id: 0,
+            username: "$owner.username",
+            avatar: "$owner.avatar"
+          }
+        },
+        { $limit: 1 } //without limit : 1 there will be multiple duplicate documents of owner as the number of video documents
+      ],
+         total: [
+        { $count: "count" }
+      ]
+      },
+    },
+  ]);
+  
+  const result = videos[0];
+
+return res.status(200).json(
+  new ApiResponse(200, {
+    owner: result.owner[0] || null,
+    videos: result.videos,
+    total: result.total[0]?.count || 0
+  }, "My videos fetched")
+);
+});
+
 export {
   getAllVideos,
   getAllUserVideos,
@@ -300,4 +434,6 @@ export {
   updateVideoDetails,
   deleteVideo,
   togglePublishStatus,
+  getChannelVideos,
+  getMyVideos,
 };

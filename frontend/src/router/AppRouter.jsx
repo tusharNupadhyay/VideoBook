@@ -3,14 +3,18 @@ import { createBrowserRouter } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout.jsx';
 import AuthLayout from '../layouts/AuthLayout.jsx';
 //Pages
-import Error from '../pages/ErrorPage.jsx';
-import Home from '../pages/Home.jsx';
-import Watch from '../pages/Watch.jsx';
-import Login from '../pages/Login.jsx';
-import Register from '../pages/Register.jsx';
-import Channel from '../pages/Channel.jsx';
-import Upload from '../pages/Upload.jsx';
-import { Profile } from '../pages/Profile.jsx';
+import {
+  ErrorPage,
+  Home,
+  Watch,
+  Login,
+  Register,
+  Channel,
+  Upload,
+  Profile,
+  MyVideos,
+  EditPage
+} from '../pages/index.js';
 // Protected wrapper
 import ProtectedRoute from './ProtectedRouter.jsx';
 import AuthRedirect from './AuthRedirect.jsx';
@@ -19,27 +23,22 @@ const AppRouter = createBrowserRouter([
   {
     path: '/',
     element: <MainLayout />, //mainLayout contains sidebar,navbar and outlet
-    errorElement: <Error />,
+    errorElement: <ErrorPage />,
     children: [
-      { index: true, element: <Home /> }, //index: true mean default path inside outlet
+      { index: true, element: <Home /> },
       { path: 'watch/:videoId', element: <Watch /> },
+       
+      // protected layout
       {
-        path: 'upload',
-        element: (
-          <ProtectedRoute>
-            <Upload />
-          </ProtectedRoute>
-        ),
+        element: <ProtectedRoute />,
+        children: [
+          { path: 'profile', element: <Profile /> },
+          { path: 'upload', element: <Upload /> },
+          { path: 'myVideos', element: <MyVideos /> },
+           { path: 'myVideos/edit/:videoId', element: <EditPage /> },
+        ],
       },
-      { path: 'channel/:username', element: <Channel /> },
-      {
-        path: 'profile',
-        element: (
-          <ProtectedRoute>
-            <Profile />
-          </ProtectedRoute>
-        ),
-      },
+      { path: 'channel/:username', element: <Channel /> },    
     ],
   },
   {
@@ -47,20 +46,14 @@ const AppRouter = createBrowserRouter([
     element: <AuthLayout />,
     children: [
       {
-        path: 'login',
-        element: (
-          <AuthRedirect>
-            <Login />
-          </AuthRedirect>
-        ),
-      },
-      {
-        path: 'register',
-        element: (
-          <AuthRedirect>
-            <Register />
-          </AuthRedirect>
-        ),
+        element: <AuthRedirect />,
+        children: [
+          {
+            path: 'login',
+            element: <Login />,
+          },
+          { path: 'register', element: <Register /> },
+        ],
       },
     ],
   },
