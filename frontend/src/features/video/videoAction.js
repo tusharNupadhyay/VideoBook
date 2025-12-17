@@ -87,3 +87,15 @@ export const getMyVideos = createAsyncThunk("video/getMyVideos", async(_,{reject
     return rejectWithValue(error.response?.data?.message || "Failed to fetch your Videos");
   }
 })
+
+//update video details like title, description ,thumbnail
+export const updateVideoDetails = createAsyncThunk("video/updateVideoDetails",async({ videoId, formData },{rejectWithValue})=>{
+
+  try {
+    const res = await api.patch(`/videos/id/${videoId}`,formData);
+    //update the response in myVideos array ???
+    return res.data.data;
+  } catch (error) {
+    return rejectWithValue(error.response?.data?.message || "Failed to update your video details");
+  }
+})

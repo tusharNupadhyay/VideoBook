@@ -6,7 +6,7 @@ import {
   toggleVideoReaction,
   getVideoReactions,
   getChannelVideos,
-  getMyVideos
+  getMyVideos,
 } from './videoAction';
 
 const initialState = {
@@ -20,33 +20,34 @@ const initialState = {
   uploadSuccess: false,
   uploadError: null,
 
-  // WATCH PAGE 
-  singleVideo: null, 
+  // WATCH PAGE
+  singleVideo: null,
   fetchLoading: false,
   fetchError: null,
-      //to fetch likes and dislikes for watch page
-      reactions: {
-        likes: 0,
-        dislikes: 0,
-        userReaction: 0,
-      },
-      reactionLoading: false,
-      reactionError: null,
+  //to fetch likes and dislikes for watch page
+  reactions: {
+    likes: 0,
+    dislikes: 0,
+    userReaction: 0,
+  },
+  reactionLoading: false,
+  reactionError: null,
 
-      // to like and dislike a video on watch page by user
-      actionLoading: false,
-      actionError: null,
-  
+  // to like and dislike a video on watch page by user
+  actionLoading: false,
+  actionError: null,
+
   // VIDEOS ON A USER CHANNEL (PUBLIC)
   channelVideos: [],
   channelLoading: false,
-  channelError: null, 
+  channelError: null,
 
-  // MANAGE YOUR VIDEOS (EDIT,DELETE) (PRIVATE)
-   myVideos: {   // always store initial state in what data type api is returning
+  // MANAGE YOUR VIDEOS (PRIVATE)
+  myVideos: {
+    // always store initial state in what data type api is returning
     videos: [],
     total: 0,
-    owner:{},
+    owner: {},
   },
   myVideosLoading: false,
   myVideosError: null,
@@ -59,21 +60,26 @@ const videoSlice = createSlice({
     clearUploadError: (state) => {
       state.uploadError = null;
     },
-    resetChannelVideos: (state) =>{
+    resetChannelVideos: (state) => {
       state.channelVideos = [];
       state.channelError = null;
       state.channelLoading = false;
     },
-    resetUploadState: (state) =>{
+    resetUploadState: (state) => {
       state.uploadLoading = false;
-      state.uploadError =null;
-      state.uploadSuccess =false;
+      state.uploadError = null;
+      state.uploadSuccess = false;
     },
     resetMyVideos: (state) => {
       state.myVideos = initialState.myVideos;
       state.myVideosError = null;
-      state.myVideosLoading =false;
-    }
+      state.myVideosLoading = false;
+    },
+    resetSingleVideo: (state) => {
+      state.singleVideo = null;
+      state.fetchError = null;
+      state.fetchLoading = false;
+    },
   },
   //always reset errors on pending
   extraReducers: (builder) => {
@@ -81,7 +87,7 @@ const videoSlice = createSlice({
       //Upload video
       .addCase(uploadVideo.pending, (state) => {
         state.uploadLoading = true;
-        state.uploadError=null;
+        state.uploadError = null;
       })
       .addCase(uploadVideo.fulfilled, (state) => {
         state.uploadLoading = false;
@@ -95,7 +101,7 @@ const videoSlice = createSlice({
       .addCase(fetchVideoById.pending, (state) => {
         state.fetchLoading = true;
         state.singleVideo = null; //clear only singleVideo state on pending not other states because you are navigating to other video so old video should not show while pending
-        state.fetchError=null;
+        state.fetchError = null;
       })
       .addCase(fetchVideoById.fulfilled, (state, action) => {
         state.fetchLoading = false;
@@ -110,7 +116,7 @@ const videoSlice = createSlice({
       //fetch all videos for homepage
       .addCase(fetchAllVideos.pending, (state) => {
         state.homeLoading = true;
-        state.homeError=null;
+        state.homeError = null;
       })
       .addCase(fetchAllVideos.fulfilled, (state, action) => {
         state.homeLoading = false;
@@ -124,7 +130,7 @@ const videoSlice = createSlice({
       // get video reactions
       .addCase(getVideoReactions.pending, (state) => {
         state.reactionLoading = true;
-        state.reactionError=null;
+        state.reactionError = null;
       })
       .addCase(getVideoReactions.fulfilled, (state, action) => {
         state.reactionLoading = false;
@@ -138,7 +144,7 @@ const videoSlice = createSlice({
       // toggle reaction
       .addCase(toggleVideoReaction.pending, (state) => {
         state.actionLoading = true;
-        state.actionError=null;
+        state.actionError = null;
       })
       .addCase(toggleVideoReaction.fulfilled, (state, action) => {
         state.actionLoading = false;
@@ -149,36 +155,41 @@ const videoSlice = createSlice({
         state.actionError = action.payload;
       })
       //get channel videos by username (public)
-      .addCase(getChannelVideos.pending,(state) => {
+      .addCase(getChannelVideos.pending, (state) => {
         state.channelLoading = true;
-        state.channelError=null;
+        state.channelError = null;
       })
-      .addCase(getChannelVideos.fulfilled,(state,action) => {
+      .addCase(getChannelVideos.fulfilled, (state, action) => {
         state.channelLoading = false;
         state.channelVideos = action.payload;
         state.channelError = null;
       })
-      .addCase(getChannelVideos.rejected,(state,action) => {
+      .addCase(getChannelVideos.rejected, (state, action) => {
         state.channelLoading = false;
         state.channelError = action.payload;
       })
       //get my videos (PRIVATE)
-      .addCase(getMyVideos.pending,(state) => {
+      .addCase(getMyVideos.pending, (state) => {
         state.myVideosLoading = true;
-        state.myVideosError=null;
+        state.myVideosError = null;
       })
-      .addCase(getMyVideos.fulfilled,(state,action) => {
+      .addCase(getMyVideos.fulfilled, (state, action) => {
         state.myVideosLoading = false;
         state.myVideos = action.payload;
         state.myVideosError = null;
       })
-      .addCase(getMyVideos.rejected,(state,action) => {
+      .addCase(getMyVideos.rejected, (state, action) => {
         state.myVideosLoading = false;
         state.myVideosError = action.payload;
-      })  
-
+      });
   },
 });
 
 export default videoSlice.reducer;
-export const { clearUploadError,resetChannelVideos,resetUploadState,resetMyVideos } = videoSlice.actions;
+export const {
+  clearUploadError,
+  resetChannelVideos,
+  resetUploadState,
+  resetMyVideos,
+  resetSingleVideo,
+} = videoSlice.actions;

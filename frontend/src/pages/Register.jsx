@@ -30,9 +30,11 @@ export default function Register() {
     try {
       const result = await dispatch(registerUser(formData)).unwrap();
       console.log('Registration successfull: ', result);
+      navigate('/auth/login'); //side effect like navigation should happen where action happens , not in the global observer like user Effect
+      dispatch(clearSuccess());
+      dispatch(clearError());
     } catch (error) {
       console.log('Registration Error: ', error);
-      navigate('/auth/login'); //side effect like navigation should happen where action happens , not in the global observer like user Effect
       dispatch(clearSuccess());
       dispatch(clearError());
     }
