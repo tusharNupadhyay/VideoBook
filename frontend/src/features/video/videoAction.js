@@ -93,6 +93,7 @@ export const updateVideoDetails = createAsyncThunk("video/updateVideoDetails",as
 
   try {
     const res = await api.patch(`/videos/id/${videoId}`,formData);
+    console.log("updated video object: ",res.data.data);
     //update the response in myVideos array ???
     return res.data.data;
   } catch (error) {

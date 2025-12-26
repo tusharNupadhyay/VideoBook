@@ -53,6 +53,7 @@ export const fetchUser = createAsyncThunk(
   'auth/fetchUser',
   async (_, { rejectWithValue }) => {
     try {
+      await api.post('/users/refresh-token');
       const res = await api.get('/users/current-user');
       return res.data.data;
     } catch (error) {

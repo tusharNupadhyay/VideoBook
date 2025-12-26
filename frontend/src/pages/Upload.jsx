@@ -4,9 +4,11 @@ import { useAppDispatch, useAppSelector } from '../app/hooks';
 // import { useNavigate } from 'react-router-dom';
 // import { fetchChannelStats } from '../features/user/userActions';
 import { clearUploadError } from '../features/video/videoSlice';
+import { useNavigate } from 'react-router-dom';
 
 export default function Upload() {
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   const { uploadLoading, uploadError } = useAppSelector(
     (state) => state.video
   );
@@ -31,10 +33,9 @@ export default function Upload() {
       const result = await dispatch(uploadVideo(formData)).unwrap(); 
       console.log('video uploaded successfully: ', result);
       reset();
-      //  await dispatch(fetchChannelStats()); // refresh data
       //navigate to video page
       // const uploadedVideo = result.data; 
-      // Navigate(`/videos/${uploadedVideo._id}`)
+      navigate('/profile');
      
       
     } catch (error) {

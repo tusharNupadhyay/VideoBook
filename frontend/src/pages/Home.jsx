@@ -16,7 +16,7 @@ export default function Home() {
   if (homeLoading) return <p>Loading Videos...</p>;
   if (homeError) return <ErrorPage />;
   return (
-    <div className="grid grid-cols-3 gap-4 p-4 bg-black/90  text-white auto-rows-max">
+    <div className="grid grid-cols-3 gap-6 px-4 py-2 items-start bg-black/90  text-white">
       {homeVideos.length === 0 ? (
         <p>No videos uploaded yet</p>
       ) : (

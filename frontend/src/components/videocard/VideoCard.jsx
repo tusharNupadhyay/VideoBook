@@ -6,7 +6,7 @@ function VideoCard({ video }) {
   return (
     <div
       onClick={() => navigate(`/watch/${video._id}`)}
-      className="border rounded-lg  overflow-hidden bg-neutral-900 cursor-pointer hover:scale-105 transition text-white min-h-[270px]"
+      className="border rounded-lg  overflow-hidden bg-neutral-900 cursor-pointer hover:scale-105 transition text-white "
     >
       <img
         src={video.thumbnail}

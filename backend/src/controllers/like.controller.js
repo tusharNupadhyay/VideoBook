@@ -15,62 +15,60 @@ const validateId = (id) => {
 };
 
 //reusable helper for toggling likes on videos,comments and tweets
-const toggleReaction = async({filter,userId,value}) => {
-
-   if (![1, -1].includes(value)) {
+const toggleReaction = async ({ filter, userId, value }) => {
+  if (![1, -1].includes(value)) {
     throw new ApiError(400, "Invalid reaction value");
   }
 
-   //find whether like by user exist on this or not
-  const reaction = await Like.findOne({...filter,likedBy: userId});
-  if(!reaction) {
-     await Like.create({
-        ...filter,
-        likedBy: userId,
-        value,
-      })
+  //find whether like by user exist on this or not
+  const reaction = await Like.findOne({ ...filter, likedBy: userId });
+  if (!reaction) {
+    await Like.create({
+      ...filter,
+      likedBy: userId,
+      value,
+    });
   }
   // Same reaction then toggle off
-  else if(reaction.value===value){
+  else if (reaction.value === value) {
     await reaction.deleteOne();
-    
   }
-   // else Switch reaction (like <--> dislike)
-   else{
-  reaction.value=value;
-  await reaction.save();
-   }
-   //Compute total likes and dislikes
-   const stats = await Like.aggregate([
-    {$match: filter}, //since we are matching with exact Id in filter so we don't need to check for null and exists
+  // else Switch reaction (like <--> dislike)
+  else {
+    reaction.value = value;
+    await reaction.save();
+  }
+  //Compute total likes and dislikes
+  const stats = await Like.aggregate([
+    { $match: filter }, //since we are matching with exact Id in filter so we don't need to check for null and exists
     {
       //groupt combines all documents given my $match based on _id for id = null it combines all documents into singe document
       $group: {
         _id: null,
         likesCount: {
-          $sum: { $cond: [{$eq:["$value",1]},1,0]},
+          $sum: { $cond: [{ $eq: ["$value", 1] }, 1, 0] },
         },
         dislikesCount: {
-          $sum: {$cond: [{$eq: ["$value",-1]},1,0]},
-        }
-      }
-    }
-   ]);
-   //find current user's reaction after toggle -1,0,1
-   const userReaction = await Like.findOne({
+          $sum: { $cond: [{ $eq: ["$value", -1] }, 1, 0] },
+        },
+      },
+    },
+  ]);
+  //find current user's reaction after toggle -1,0,1
+  const userReaction = await Like.findOne({
     ...filter,
     likedBy: userId,
-   })
+  });
   return {
     likes: stats[0]?.likesCount || 0,
     dislikes: stats[0]?.dislikesCount || 0,
-    userReaction: userReaction?.value || 0,
+    userReaction: userReaction?.value || null,
   };
-}
+};
 
 const toggleVideoLike = asyncHandler(async (req, res) => {
   const videoId = validateId(req.params.videoId);
-  const userId = validateId(req.user?._id)
+  const userId = validateId(req.user?._id);
 
   const { value } = req.body; // FROM BODY
 
@@ -79,21 +77,21 @@ const toggleVideoLike = asyncHandler(async (req, res) => {
   if (!video) throw new ApiError(404, "Video does not exist");
 
   const result = await toggleReaction({
-    filter: {video:videoId},
+    filter: { video: videoId },
     userId,
-    value
-  })
-  return res.status(200).json(
-    new ApiResponse(200, result, "Video reaction updated")
-  );
+    value,
+  });
+  return res
+    .status(200)
+    .json(new ApiResponse(200, result, "Video reaction updated"));
 });
 const toggleCommentLike = asyncHandler(async (req, res) => {
   //toggle like on a comment
   const commentId = validateId(req.params.commentId);
-  const userId = validateId(req.user?._id)
+  const userId = validateId(req.user?._id);
 
   const { value } = req.body;
- 
+
   //check if comment exist or not
   const comment = await Comment.findById(commentId);
   if (!comment) throw new ApiError(404, "Comment does not exist");
@@ -104,42 +102,42 @@ const toggleCommentLike = asyncHandler(async (req, res) => {
     value,
   });
 
-  return res.status(200).json(
-    new ApiResponse(200, result, "Comment reaction updated")
-  );
+  return res
+    .status(200)
+    .json(new ApiResponse(200, result, "Comment reaction updated"));
 });
 const toggleTweetLike = asyncHandler(async (req, res) => {
   const tweetId = validateId(req.params.tweetId);
-  const userId = validateId(req.user?._id)
+  const userId = validateId(req.user?._id);
 
   const { value } = req.body;
 
   const tweet = await Tweet.findById(tweetId);
   if (!tweet) throw new ApiError(404, "Tweet does not exist");
 
-   const result = await toggleReaction({
+  const result = await toggleReaction({
     filter: { tweet: tweetId },
     userId,
     value,
   });
 
-  return res.status(200).json(
-    new ApiResponse(200, result, "Tweet reaction updated")
-  );
+  return res
+    .status(200)
+    .json(new ApiResponse(200, result, "Tweet reaction updated"));
 });
 const getLikedVideos = asyncHandler(async (req, res) => {
-  const userId = validateId(req.user?._id)
+  const userId = validateId(req.user?._id);
 
-  //TODO: pagination 
+  //TODO: pagination
   const likedVideos = await Like.aggregate([
     {
       $match: {
         likedBy: new mongoose.Types.ObjectId(userId),
-        video: { $exists: true,$ne: null }, //$exists: true alone is not enough,MongoDB treats null as existing so $ne:null
+        video: { $exists: true, $ne: null }, //$exists: true alone is not enough,MongoDB treats null as existing so $ne:null
         value: 1, //only likes no dislikes
       },
     },
-     {
+    {
       $sort: { createdAt: -1 }, // most recent first
     },
     {
@@ -197,39 +195,54 @@ const getLikedVideos = asyncHandler(async (req, res) => {
       new ApiResponse(200, likedVideos, "Liked videos fetched successfully")
     );
 });
-const getVideoReactions =asyncHandler(async (req,res) => {
+const getVideoReactions = asyncHandler(async (req, res) => {
   //get likes dislikes for a video
   const videoId = validateId(req.params.videoId);
   const userId = req.user?._id || null;
 
   const stats = await Like.aggregate([
     {
-      $match:{
+      $match: {
         video: videoId,
-        value: { $in: [1,-1]},
+        value: { $in: [1, -1] },
       },
     },
     {
       $group: {
         _id: null,
         likes: {
-          $sum: { $cond: [{$eq: ["$value",1]},1,0]},
+          $sum: { $cond: [{ $eq: ["$value", 1] }, 1, 0] },
         },
         dislikes: {
-          $sum: { $cond: [{$eq: ["$value",-1]},1,0]},
-        }
-      }
-    }
+          $sum: { $cond: [{ $eq: ["$value", -1] }, 1, 0] },
+        },
+      },
+    },
   ]);
-  //find user's last reaction if logged in 
+  //find user's last reaction if logged in
   let userReaction = null;
-  if(userId){
+  if (userId) {
     const doc = await Like.findOne({
       video: videoId,
       likedBy: userId,
     }).select("value");
     userReaction = doc?.value ?? null;
   }
-  return res.status(200).json(new ApiResponse(200,{likes:stats[0]?.likes || 0,dislikes: stats[0]?.dislikes || 0,userReaction}));
-})
-export { toggleVideoLike, toggleCommentLike, toggleTweetLike, getLikedVideos,getVideoReactions };
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, {
+        likes: stats[0]?.likes || 0,
+        dislikes: stats[0]?.dislikes || 0,
+        userReaction,
+      })
+    );
+});
+
+export {
+  toggleVideoLike,
+  toggleCommentLike,
+  toggleTweetLike,
+  getLikedVideos,
+  getVideoReactions,
+};

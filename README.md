@@ -1,10 +1,10 @@
-🎥 VideoBook
+## 🎥 VideoBook
 
 VideoBook is a full-stack video sharing platform inspired by YouTube, built to demonstrate real-world backend architecture, authentication, media handling, and scalable frontend state management.
 
 This project is currently under active development.
 
-🚀 Features
+## 🚀 Features
 User & Auth
 
 - User registration and login with JWT authentication
@@ -41,7 +41,7 @@ Frontend
 
 - Client-side routing using React Router
 
-🛠️ Tech Stack
+## 🛠️ Tech Stack
 
 Frontend
 
@@ -79,7 +79,7 @@ Tools
 
 - MongoDB Atlas
 
-🧠 Backend Highlights
+## Backend Highlights
 
 - Designed RESTful APIs following clean controller and middleware patterns.
 
@@ -113,11 +113,11 @@ VideoBook/
 │       └── router/       # Route structure
 │
 └── README.md
+```
 
+## Environment Variables
 
-
-⚙️ Environment Variables
-
+```env
 PORT=8000
 NODE_ENV=development
 MONGODB_URI=mongoDB_atlas_uri
@@ -131,9 +131,9 @@ CLOUDINARY_CLOUD_NAME=cloudinary_name
 CLOUDINARY_API_KEY=cloudinary_api_key
 CLOUDINARY_API_SECRET=cloudinary_api_secret
 CLOUDINARY_URL=cloudinary_url
+```
 
-
-🏃‍♂️ Running the Project Locally
+## Running the Project Locally
 
 Backend
 - cd backend
@@ -145,7 +145,7 @@ Frontend
 - npm install
 - npm run dev
 
-🔮 Future Improvements
+## Future Improvements
 
 - Comment system
 

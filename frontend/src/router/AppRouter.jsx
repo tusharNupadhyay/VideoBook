@@ -23,7 +23,7 @@ const AppRouter = createBrowserRouter([
   {
     path: '/',
     element: <MainLayout />, //mainLayout contains sidebar,navbar and outlet
-    errorElement: <ErrorPage />,
+    errorElement: <ErrorPage />, //route level error boundary, renders errorPage when anything goes wrong while resolving this route (can catch error thrown in loader thunks)
     children: [
       { index: true, element: <Home /> },
       { path: 'watch/:videoId', element: <Watch /> },

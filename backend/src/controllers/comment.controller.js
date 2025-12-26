@@ -3,6 +3,8 @@ import { Comment } from "../models/comment.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { Like } from "../models/like.model.js";
+import { Video } from "../models/video.model.js";
 
 const validateId = (id) => {
   if (!id) throw new ApiError(400, "Id is missing");
@@ -11,8 +13,13 @@ const validateId = (id) => {
   return new mongoose.Types.ObjectId(id);
 };
 const getVideoComments = asyncHandler(async (req, res) => {
-  //get all comments for a video
-  const { videoId } = req.params;
+  /*
+  for a given video: get paginated comments,
+  for each comment,
+  get comment owner details like username ,avatar,
+  get total likes and dislikes for each comment,
+  if user is logged in get userReaction which checks whether user has liked the comment or not
+  */
   const {
     page = 1,
     limit = 10,
@@ -20,65 +27,118 @@ const getVideoComments = asyncHandler(async (req, res) => {
     // sortType = "desc",
   } = req.query;
 
-  //validate video id
-  const id = validateId(videoId);
-
+  const videoId = validateId(req.params.videoId);
+  const userId = req.user?._id || null;
   const pageNumber = parseInt(page) || 1;
   const limitNumber = parseInt(limit) || 10;
-  const options = {
-    page: pageNumber,
-    limit: limitNumber,
-  };
-  //   const sortOrder = sortType === "asc" ? 1 : -1;
-  //   const sortStage = {
-  //     [sortBy]: sortOrder,
-  //   };
-  const pipeline = [
-    {
-      $match: {
-        video: id,
-      },
-    },
+  /*
+    const sortOrder = sortType === "asc" ? 1 : -1;
+    const sortStage = {
+      [sortBy]: sortOrder,
+    };
+    */
+
+  //fetch comments + owner
+  const comments = await Comment.aggregate([
+    { $match: { video: videoId } },
     {
       $lookup: {
         from: "users",
         localField: "owner",
         foreignField: "_id",
-        as: "commentator",
+        as: "owner",
       },
     },
-    {
-      $unwind: "$commentator",
-    },
+    { $unwind: "$owner" },
     {
       $project: {
         _id: 1,
         content: 1,
         createdAt: 1,
-        commentator: {
+        owner: {
           _id: 1,
           username: 1,
           avatar: 1,
-          fullName: 1,
-          createdAt: 1,
         },
       },
     },
+    { $sort: { createdAt: -1 } },
+    { $skip: (pageNumber - 1) * limitNumber },
+    { $limit: limitNumber },
+  ]);
+
+  //array of comment id's
+  const commentIds = comments.map((c) => c._id);
+
+  //Initialize reactionsMap with all comments (default 0/0/null)
+  const reactionsMap = {};
+  comments.forEach((c) => {
+    reactionsMap[c._id] = { likes: 0, dislikes: 0, userReaction: null };
+  });
+
+  //fetch likes and dislikes for all comments (* comments which have 0 likes or 0 dislikes will not be present in reactionstats)
+  const reactionStats = await Like.aggregate([
     {
-      $sort: { createdAt: -1 },
+      $match: {
+        comment: { $in: commentIds },
+        value: { $in: [1, -1] },
+      },
     },
-  ];
-  const aggregate = Comment.aggregate(pipeline);
-  const result = await Comment.aggregatePaginate(aggregate, options);
-  return res
-    .status(200)
-    .json(new ApiResponse(200, result, "All comments fetched successfully"));
+    {
+      $group: {
+        _id: "$comment",
+        likes: { $sum: { $cond: [{ $eq: ["$value", 1] }, 1, 0] } },
+        dislikes: { $sum: { $cond: [{ $eq: ["$value", -1] }, 1, 0] } },
+      },
+    },
+  ]);
+
+  //update reactionStats with aggregated likes and dislikes
+  reactionStats.forEach((r) => {
+    reactionsMap[r._id].likes = r.likes;
+    reactionsMap[r._id].dislikes = r.dislikes;
+  });
+  if (userId) {
+    //fetch all the comments which user have liked if user is logged in
+    const userReactions = await Like.find({
+      comment: { $in: commentIds },
+      likedBy: userId,
+    }).select("comment value");
+
+    //update the value in the reactionsMap
+    userReactions.forEach((r) => {
+      //r is a like document so r.comment is comment id
+      reactionsMap[r.comment].userReaction = r.value;
+    });
+  }
+
+  //now merge reactions into comments
+  const finalComments = comments.map((c) => ({
+    ...c,
+    reactions: reactionsMap[c._id],
+  }));
+
+  //total comment count for pagination
+  const totalComments = await Comment.countDocuments({ video: videoId });
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        comments: finalComments,
+        totalComments,
+        page,
+        totalPages: Math.ceil(totalComments / limit),
+      },
+      "All comments fetched successfully"
+    )
+  );
 });
 const addComment = asyncHandler(async (req, res) => {
   // add a comment to a video
   const { content } = req.body;
   const videoId = validateId(req.params.videoId);
-  const userId = req.user?._id; //no need to validate as it is already validated from auth
+  const userId = validateId(req.user._id);
   if (!content?.trim()) throw new ApiError(400, "content is missing");
   const comment = await Comment.create({
     content,
@@ -99,29 +159,29 @@ const editComment = asyncHandler(async (req, res) => {
   //edit a comment
   const { content } = req.body;
   const commentId = validateId(req.params.commentId);
-  const userId = req.user?._id;
-  if (!content?.trim()) throw new ApiError(400, "content is missing");
+  const userId = req.user?._id
+  if (!content?.trim()) {
+    throw new ApiError(400, "Comment content cannot be empty");
+  }
 
-  const updatedComment = await Comment.findOneAndUpdate(
-    { _id: commentId, owner: userId },
-    {
-      $set: {
-        content: content,
-      },
-    },
-    {
-      new: true,
-    }
-  ).populate("owner", "username fullName avatar");
-  if (!updatedComment) throw new ApiError(403, "You cannot edit this comment");
+  const comment = await Comment.findById(commentId).populate(
+    "owner",
+    "username avatar"
+  );
+  if (!comment) {
+    throw new ApiError(404, "Comment not found");
+  }
+  if (comment.owner._id.toString() !== userId.toString()) {
+    throw new ApiError(403, "You are not allowed to edit this comment");
+  }
+
+  comment.content = content;
+  await comment.save();
+
   return res
     .status(200)
     .json(
-      new ApiResponse(
-        200,
-        updatedComment,
-        "Comment has been updated successfully"
-      )
+      new ApiResponse(200, comment, "Comment has been updated successfully")
     );
 });
 const deleteComment = asyncHandler(async (req, res) => {
@@ -129,17 +189,22 @@ const deleteComment = asyncHandler(async (req, res) => {
   const commentId = validateId(req.params.commentId);
   const userId = req.user?._id;
 
-  const comment = await Comment.findById(commentId);
+  const comment = await Comment.findById(commentId).populate("video", "owner"); //so that you can access comment.video.owner
   if (!comment) throw new ApiError(404, "Comment not found");
 
-  //Only Owner can delete the comment
-  if (comment.owner.toString() !== userId.toString())
-    throw new ApiError(403, "you are not allowed to delete this comment");
+  //Only comment owner and video owner can delete the comment
+  const isCommentOwner = comment.owner.toString() === userId.toString();
 
-  await Comment.findByIdAndDelete(commentId);
+  const isVideoOwner = comment.video.owner.toString() === userId.toString();
+
+  if (!isCommentOwner && !isVideoOwner) {
+    throw new ApiError(403, "You are not allowed to delete this comment");
+  }
+
+  await comment.deleteOne();
 
   return res
     .status(200)
-    .json(new ApiResponse(200, "Comment deleted successfully."));
+    .json(new ApiResponse(200, commentId, "Comment deleted successfully."));
 });
-export { getVideoComments, addComment, editComment,deleteComment };
+export { getVideoComments, addComment, editComment, deleteComment };

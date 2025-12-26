@@ -7,6 +7,7 @@ import {
   getVideoReactions,
   getChannelVideos,
   getMyVideos,
+  updateVideoDetails
 } from './videoAction';
 
 const initialState = {
@@ -28,7 +29,7 @@ const initialState = {
   reactions: {
     likes: 0,
     dislikes: 0,
-    userReaction: 0,
+    userReaction: null,
   },
   reactionLoading: false,
   reactionError: null,
@@ -181,7 +182,26 @@ const videoSlice = createSlice({
       .addCase(getMyVideos.rejected, (state, action) => {
         state.myVideosLoading = false;
         state.myVideosError = action.payload;
-      });
+      })
+      //update video details
+      .addCase(updateVideoDetails.pending,(state)=>{
+        state.fetchLoading=true;
+        state.singleVideo=null;
+        state.fetchError=null;
+      })
+      .addCase(updateVideoDetails.fulfilled,(state,action)=>{
+        state.fetchLoading=false;
+        const updatedVideo = action.payload;
+        state.myVideos.videos = state.myVideos.videos.map(video=> video._id===updatedVideo._id ? updatedVideo : video);
+        //Method 2 RTK also allows direct mutation via immer, so can also do this
+        //const index = state.myVideos.videos.findIndex(video=> video._id===updatedVideo._id);
+        //if(index!==-1) state.myVideos.videos[index] = updatedVideo;
+      })
+      .addCase(updateVideoDetails.rejected,(state,action)=>{
+        state.fetchLoading=false;
+        state.fetchError = action.payload;
+      })
+      
   },
 });
 

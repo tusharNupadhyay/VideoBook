@@ -48,7 +48,6 @@ function SidebarItems({ icon, label, isOpen, to }) {
     const navigate = useNavigate();
     const {initialized,userInfo} = useAppSelector(state=>state.auth);
     const handleClick = () => {
-        console.log("authorization: ",{initialized,userInfo});
         if(!initialized)  return <div className="text-blue-700 p-4">Checking session...</div>;
         if(!userInfo && to === "/profile")
         {
