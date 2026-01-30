@@ -100,3 +100,30 @@ export const updateVideoDetails = createAsyncThunk("video/updateVideoDetails",as
     return rejectWithValue(error.response?.data?.message || "Failed to update your video details");
   }
 })
+
+export const getWatchHistory = createAsyncThunk("video/getWatchHistory",async(_,{rejectWithValue})=>{
+  try {
+    const res = await api.get('/users/history');
+    return res.data.data;
+  } catch (error) {
+    return rejectWithValue(error.response?.data?.message || "Failed to fetch watch history");
+  }
+})
+export const getLikedVideos = createAsyncThunk("video/getLikedVideos",async(_,{rejectWithValue})=>{
+  try {
+    const res = await api.get('/likes/videos');
+    return res.data.data;
+  } catch (error) {
+    return rejectWithValue(error.response?.data?.message || "Failed to fetch liked videos");
+  }
+})
+
+export const deleteVideo = createAsyncThunk("video/deleteVideo",async(videoId,{rejectWithValue})=>{
+  try {
+    const res = await api.delete(`/videos/id/${videoId}`);
+    return res.data.data;
+  } catch (error) {
+        return rejectWithValue(error.response?.data?.message || "Failed to delete video");
+
+  }
+})

@@ -285,54 +285,81 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
 });
 
 const getWatchHistory = asyncHandler(async (req, res) => {
-  //the id that we get from database is a string but by using mongoose queries , it automatically converts it to mongodb object id
-  //but mongoose doesn't work on aggregattion pipelines , it directly goes to mongodb
+  const userId = validateId(req.user?._id);
+  const page = Number(req.query.page) || 1;
+  const limit = Number(req.query.limit) || 10;
+  const skip = (page - 1) * limit;
+
   const user = await User.aggregate([
     {
       $match: {
-        _id: req.user._id, //no need to wrap this into new mongoose.Types.ObjectId() as user is fetched by mongoose and attached to req in verifyJWT
+        _id: userId,
       },
+    },
+    {
+      $project: { watchHistory: 1 },
     },
     {
       $lookup: {
         from: "videos",
-        localField: "watchHistory",
-        foreignField: "_id",
-        as: "watchHistory",
+        let: { history: "$watchHistory" },
         pipeline: [
-          //this pipeline runs on each video found
-          //this pipeline is to look up for owner(user)
+          {
+            $match: {
+              $expr: { $in: ["$_id", "$$history"] }, //select only video's whose id's exist in watchHistory
+            },
+          },
+          {
+            //Figures out where each video appears in the user’s watchHistory array and stores that position as watchIndex so the results can be sorted correctly.
+            $addFields: {
+              //indexOfArray returns the position index of video _id inside history array and -1 if not found
+              watchIndex: { $indexOfArray: ["$$history", "$_id"] },
+            },
+          },
+          {
+            $sort: { watchIndex: -1 }, //most recently watched first
+          },
+          //pagination
+          { $skip: skip },
+          { $limit: limit },
+          //lookup owner
           {
             $lookup: {
               from: "users",
               localField: "owner",
               foreignField: "_id",
-              as: "ownerArray",
-              pipeline: [
-                {
-                  //doing this inside owner will project every details under owner not outside
-                  $project: {
-                    fullName: 1,
-                    username: 1,
-                    avatar: 1,
-                  },
-                },
-              ],
-            },
-          },
-          //this creates an owner object with username, avatar, fullname field
-          {
-            $addFields: {
-              owner: {
-                $first: "$ownerArray",
-              },
+              as: "owner",
             },
           },
           {
-            //this removes the ownerarray because owner object is already there
-            $project: { ownerArray: 0 },
+            $unwind: "$owner",
+          },
+          //select only required field
+          {
+            $project: {
+              thumbnail: 1,
+              duration: 1,
+              title: 1,
+              "owner.username": 1,
+              "owner.avatar": 1,
+              createdAt: 1,
+              viewCount: { $size: { $ifNull: ["$views", []] } },
+            },
           },
         ],
+        as: "watchHistory",
+      },
+    },
+    {
+      $addFields: {
+        totalHistory: { $size: "$watchHistory" },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        watchHistory: 1,
+        totalHistory: 1,
       },
     },
   ]);
@@ -340,7 +367,6 @@ const getWatchHistory = asyncHandler(async (req, res) => {
     new ApiResponse(
       200,
       {
-        totalHistory: user?.[0]?.watchHistory.length || 0,
         history: user?.[0]?.watchHistory,
       },
       "watch history fetched successfully"

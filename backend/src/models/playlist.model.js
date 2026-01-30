@@ -11,6 +11,11 @@ const playlistSchema = new Schema(
       type: String,
       trim: true
     },
+
+    coverImage:{
+      type: String,
+      default: null,
+    },
     videos: [
       {
         type: Schema.Types.ObjectId,
@@ -22,6 +27,11 @@ const playlistSchema = new Schema(
       ref: "User",
       required: true
     },
+    privacy: {
+      type: String,
+      enum: ["public", "private"],
+      default: "public" 
+    }
   },
   { timestamps: true }
 );

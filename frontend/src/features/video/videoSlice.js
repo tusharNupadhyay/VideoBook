@@ -7,10 +7,17 @@ import {
   getVideoReactions,
   getChannelVideos,
   getMyVideos,
-  updateVideoDetails
+  updateVideoDetails,
+  getLikedVideos,
+  getWatchHistory,
+  deleteVideo
 } from './videoAction';
 
 const initialState = {
+  // Delete Video states
+  deleteVideoLoading: false,
+  deleteVideoError: null,
+
   // HOME PAGE VIDEOS
   homeVideos: [],
   homeLoading: false,
@@ -37,6 +44,21 @@ const initialState = {
   // to like and dislike a video on watch page by user
   actionLoading: false,
   actionError: null,
+
+  // USER WATCH HISTORY
+  watchHistory: {
+    videos: [],
+    loading: false,
+    error: null,
+  },
+
+  // USER LIKED VIDEOS
+  likedVideos: {
+    videos: [],
+    total: 0,
+    loading: false,
+    error: null,
+  },
 
   // VIDEOS ON A USER CHANNEL (PUBLIC)
   channelVideos: [],
@@ -80,6 +102,12 @@ const videoSlice = createSlice({
       state.singleVideo = null;
       state.fetchError = null;
       state.fetchLoading = false;
+    },
+    resetWatchHistory: (state) => {
+      state.watchHistory = initialState.watchHistory;
+    },
+    resetLikedVides: (state) => {
+      state.likedVideos = initialState.likedVideos;
     },
   },
   //always reset errors on pending
@@ -184,24 +212,64 @@ const videoSlice = createSlice({
         state.myVideosError = action.payload;
       })
       //update video details
-      .addCase(updateVideoDetails.pending,(state)=>{
-        state.fetchLoading=true;
-        state.singleVideo=null;
-        state.fetchError=null;
+      .addCase(updateVideoDetails.pending, (state) => {
+        state.fetchLoading = true;
+        state.singleVideo = null;
+        state.fetchError = null;
       })
-      .addCase(updateVideoDetails.fulfilled,(state,action)=>{
-        state.fetchLoading=false;
+      .addCase(updateVideoDetails.fulfilled, (state, action) => {
+        state.fetchLoading = false;
         const updatedVideo = action.payload;
-        state.myVideos.videos = state.myVideos.videos.map(video=> video._id===updatedVideo._id ? updatedVideo : video);
+        state.myVideos.videos = state.myVideos.videos.map((video) =>
+          video._id === updatedVideo._id ? updatedVideo : video
+        );
         //Method 2 RTK also allows direct mutation via immer, so can also do this
         //const index = state.myVideos.videos.findIndex(video=> video._id===updatedVideo._id);
         //if(index!==-1) state.myVideos.videos[index] = updatedVideo;
       })
-      .addCase(updateVideoDetails.rejected,(state,action)=>{
-        state.fetchLoading=false;
+      .addCase(updateVideoDetails.rejected, (state, action) => {
+        state.fetchLoading = false;
         state.fetchError = action.payload;
       })
-      
+      // WATCH HISTORY
+      .addCase(getWatchHistory.pending, (state) => {
+        state.watchHistory.loading = true;
+        state.watchHistory.error = null;
+      })
+      .addCase(getWatchHistory.fulfilled,(state,action) => {
+        state.watchHistory.loading = false;
+        state.watchHistory.videos = action.payload.history;
+      })
+      .addCase(getWatchHistory.rejected,(state,action)=> {
+        state.watchHistory.error = action.payload;
+        state.watchHistory.loading = false;
+      })
+      //Liked Videos
+      .addCase(getLikedVideos.pending, (state) => {
+        state.likedVideos.loading = true;
+        state.likedVideos.error = null;
+      })
+      .addCase(getLikedVideos.fulfilled,(state,action) => {
+        state.likedVideos.loading = false;
+        state.likedVideos.videos = action.payload;
+      })
+      .addCase(getLikedVideos.rejected,(state,action)=> {
+        state.likedVideos.error = action.payload;
+        state.likedVideos.loading = false;
+      })
+      //Delete video
+      .addCase(deleteVideo.pending,(state) => {
+        state.deleteVideoLoading = true;
+        state.deleteVideoError = null;
+      })
+      .addCase(deleteVideo.fulfilled,(state,action)=>{
+        state.deleteVideoLoading =false;
+        state.myVideos.videos = state.myVideos.videos.filter(video => video._id !== action.payload);
+      })
+      .addCase(deleteVideo.rejected,(state,action)=>{
+        state.deleteVideoLoading = false;
+        state.deleteVideoError = action.payload || "cannot delete video";
+      })
   },
 });
 

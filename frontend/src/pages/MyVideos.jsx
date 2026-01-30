@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useAppSelector, useAppDispatch } from '../app/hooks';
-import { getMyVideos } from '../features/video/videoAction';
+import { getMyVideos,deleteVideo } from '../features/video/videoAction';
 import { FaEdit } from 'react-icons/fa';
 import { MdDelete } from 'react-icons/md';
 import ConfirmDelete from './ConfirmDelete';
@@ -60,7 +60,7 @@ export default function MyVideos() {
 function ManageVideos({ video }) {
     const [showConfirm, setShowConfirm] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState(null);
-
+const dispatch = useAppDispatch();
   const handleDeleteClick = (video) => {
     setSelectedVideo(video);
     setShowConfirm(true);
@@ -68,7 +68,7 @@ function ManageVideos({ video }) {
 
   const handleConfirmDelete = () => {
     console.log("Deleting:", selectedVideo.id);
-    // deleteVideo(selectedVideo.id);
+    dispatch(deleteVideo(selectedVideo._id));
     setShowConfirm(false);
     setSelectedVideo(null);
   };

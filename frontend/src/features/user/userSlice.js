@@ -1,8 +1,6 @@
 import { createSlice } from '@reduxjs/toolkit';
-import {
-  getChannelProfile,
-  getMyProfile,
-} from './userActions';
+import { getChannelProfile, getMyProfile } from './userActions';
+import { logout } from '../auth/authSlice';
 
 const initialState = {
   // PUBLIC CHANNEL PROFILE (by username)
@@ -33,6 +31,8 @@ const userSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
+      //logout
+      .addCase(logout, () => initialState)
       //Fetch Public channel
       .addCase(getChannelProfile.pending, (state) => {
         state.channelLoading = true;
@@ -56,11 +56,11 @@ const userSlice = createSlice({
         state.myProfile = action.payload;
       })
       .addCase(getMyProfile.rejected, (state, action) => {
-        state.myProfileLoading = false; 
+        state.myProfileLoading = false;
         state.myProfileError = action.payload;
       });
   },
 });
 
 export default userSlice.reducer;
-export const { resetChannelProfile,resetMyProfile } = userSlice.actions;
+export const { resetChannelProfile, resetMyProfile } = userSlice.actions;

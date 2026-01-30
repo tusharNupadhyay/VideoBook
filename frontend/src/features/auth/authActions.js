@@ -53,32 +53,24 @@ export const fetchUser = createAsyncThunk(
   'auth/fetchUser',
   async (_, { rejectWithValue }) => {
     try {
-      await api.post('/users/refresh-token');
+      //first try access token
       const res = await api.get('/users/current-user');
       return res.data.data;
     } catch (error) {
-      if (!error.response) {
-        return rejectWithValue('Network error');
-      }
-      // if Not logged in then silent fail
-      if (error.response?.status === 401) {
-        return null;
+      //Only 401 should trigger refresh ,everything else is bug
+      if (error.response?.status !== 401) {
+        return rejectWithValue("something went wrong"); 
       }
       //access token expired so send request to generate new refresh token
-      if (error.response?.data?.message === 'TokenExpired') {
-        try {
-          await api.post('/users/refresh-token');
-
-          // retry
-          const res2 = await api.get('/users/current-user');
-          return res2.data.data;
-        } catch (err) {
-          return rejectWithValue(
-            err?.response?.data?.message || 'Session expired'
-          );
-        }
+      try {
+        await api.post('/users/refresh-token');
+        // retry
+        const res2 = await api.get('/users/current-user');
+        return res2.data.data;
+      } catch {
+         // session truly expired
+         return rejectWithValue("session expired");
       }
-      return rejectWithValue('Unauthorized');
     }
   }
 );

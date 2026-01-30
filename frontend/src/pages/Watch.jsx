@@ -1,6 +1,6 @@
 import { useParams } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../app/hooks';
-import { useEffect } from 'react';
+import { useEffect, useState} from 'react';
 import {
   fetchVideoById,
   getVideoReactions,
@@ -8,13 +8,13 @@ import {
 } from '../features/video/videoAction';
 import { fetchCommentsByVideo } from '../features/comments/commentAction.js';
 import ErrorPage from '../pages/ErrorPage.jsx';
+import AddToPlaylistModal from './AddToPlaylistModal.jsx';
+import CreatePlaylistModal from './CreatePlaylistModal.jsx';
 import { BiSolidLike } from 'react-icons/bi';
 import { BiSolidDislike } from 'react-icons/bi';
-import {CommentSection} from "../components/index.js";
-
+import { CommentSection } from '../components/index.js';
+import { CiSaveDown2 } from 'react-icons/ci';
 export default function Watch() {
-
-
   const { videoId } = useParams();
   const dispatch = useAppDispatch();
   const { userInfo } = useAppSelector((state) => state.auth);
@@ -27,12 +27,14 @@ export default function Watch() {
     reactions,
   } = useAppSelector((state) => state.video);
 
+  const [isSaveOpen, setIsSaveOpen] = useState(false);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+
   const isOwner =
     video?.owner?._id && userInfo?._id && video.owner._id === userInfo._id;
 
   const isLoggedIn = !!userInfo;
-  const disableReactions =
-    !isLoggedIn || reactionLoading || actionLoading;
+  const disableReactions = !isLoggedIn || reactionLoading || actionLoading;
 
   useEffect(() => {
     dispatch(fetchVideoById(videoId));
@@ -40,6 +42,7 @@ export default function Watch() {
     dispatch(fetchCommentsByVideo(videoId));
   }, [videoId, dispatch]);
 
+ 
   if (fetchLoading || !video) return <p>Loading Video...</p>;
   if (fetchError) {
     return <ErrorPage />;
@@ -64,7 +67,32 @@ export default function Watch() {
           <div className=" bg-black flex justify-between rounded-lg p-2">
             {/*title */}
             <p className="text-xl">{video.title}</p>
-            <p className="mr-4">Views: {video.viewCount} </p>
+            <div className=" relative flex gap-2 mr-4 items-center">
+              <button
+              disabled = {!isLoggedIn}
+              //prevent this click from reaching the document listener
+              onMouseDown={(e) => e.stopPropagation()}
+                onClick={() => setIsSaveOpen((prev)=> !prev)}
+                className="flex gap-1 items-center cursor-pointer bg-neutral-800 px-2 py-1 rounded-full hover:scale-105"
+              >
+                <CiSaveDown2 /> <span>Save</span>
+              </button>
+              {/* FLOATING SAVE POPUP */}
+              {isSaveOpen && <AddToPlaylistModal
+                videoId ={videoId}
+                onClose={() => setIsSaveOpen(false)}
+                onCreateNew={() => {
+                  setIsSaveOpen(false);
+                  setIsCreateOpen(true);
+                }}
+              />}
+              {/* CREATE PLAYLIST MODAL */}
+              {isCreateOpen &&  <CreatePlaylistModal
+                videoId={videoId}
+                onClose={() => setIsCreateOpen(false)}
+              />}
+              <p>Views: {video.viewCount} </p>
+            </div>
           </div>
           <div className="bg-black flex rounded-lg p-2 justify-between">
             <div className="flex gap-2 items-center">
@@ -137,8 +165,7 @@ export default function Watch() {
             <p className="text-sm">{video.description}</p>
           </div>
         </div>
-        <CommentSection videoId={videoId}/>
-        
+        <CommentSection videoId={videoId} />
       </div>
       <div className="flex flex-col gap-2 items-center">
         <h2>Suggessted videos</h2>

@@ -128,7 +128,10 @@ const toggleTweetLike = asyncHandler(async (req, res) => {
 const getLikedVideos = asyncHandler(async (req, res) => {
   const userId = validateId(req.user?._id);
 
-  //TODO: pagination
+  const page = Number(req.query.page) || 1;
+  const limit = Number(req.query.limit) || 10;
+  const skip = (page - 1) * limit;
+
   const likedVideos = await Like.aggregate([
     {
       $match: {
@@ -140,6 +143,8 @@ const getLikedVideos = asyncHandler(async (req, res) => {
     {
       $sort: { createdAt: -1 }, // most recent first
     },
+    { $skip: skip },
+    { $limit: limit },
     {
       //lookup the video Details
       $lookup: {
@@ -147,47 +152,44 @@ const getLikedVideos = asyncHandler(async (req, res) => {
         localField: "video",
         foreignField: "_id",
         as: "videoDetails",
+        pipeline: [
+          {
+            $match: { isPublished: true },
+          },
+          {
+            $lookup: {
+              from: "users",
+              localField: "owner",
+              foreignField: "_id",
+              as: "owner",
+            },
+          },
+          {
+            $unwind: "$owner",
+          },
+          {
+            $project: {
+              thumbnail: 1,
+              title: 1,
+              duration: 1,
+              viewCount: { $size: { $ifNull: ["$views", []] } },
+              owner: {
+                username: "$owner.username",
+                avatar: "$owner.avatar",
+              },
+              createdAt: 1,
+            },
+          },
+        ],
       },
     },
     {
       $unwind: "$videoDetails",
     },
     {
-      //2nd lookup the owner details from user model
-      $lookup: {
-        from: "users",
-        localField: "videoDetails.owner",
-        foreignField: "_id",
-        as: "ownerDetails",
-      },
-    },
-    {
-      $unwind: "$ownerDetails",
-    },
-    {
-      $project: {
-        _id: 0, //hide the id of the like document because we need liked videos (video id)
-        likedAt: "$createdAt",
-        video: {
-          _id: "$videoDetails._id",
-          isPublished: "$videoDetails.isPublished",
-          title: "$videoDetails.title",
-          thumbnail: "$videoDetails.thumbnail",
-          duration: "$videoDetails.duration",
-          viewCount: {
-            $size: {
-              $ifNull: ["$videoDetails.views", []],
-            },
-          },
-          owner: {
-            _id: "$ownerDetails._id",
-            username: "$ownerDetails.username",
-            fullName: "$ownerDetails.fullName",
-            avatar: "$ownerDetails.avatar",
-          },
-        },
-      },
-    },
+      //throws away the current document(like) and make videoDetails the new current document
+      $replaceRoot: {newRoot: "$videoDetails"},
+    }
   ]);
   return res
     .status(200)
@@ -228,15 +230,13 @@ const getVideoReactions = asyncHandler(async (req, res) => {
     }).select("value");
     userReaction = doc?.value ?? null;
   }
-  return res
-    .status(200)
-    .json(
-      new ApiResponse(200, {
-        likes: stats[0]?.likes || 0,
-        dislikes: stats[0]?.dislikes || 0,
-        userReaction,
-      })
-    );
+  return res.status(200).json(
+    new ApiResponse(200, {
+      likes: stats[0]?.likes || 0,
+      dislikes: stats[0]?.dislikes || 0,
+      userReaction,
+    })
+  );
 });
 
 export {

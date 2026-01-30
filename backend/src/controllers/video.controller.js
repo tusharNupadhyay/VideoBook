@@ -263,7 +263,7 @@ const deleteVideo = asyncHandler(async (req, res) => {
   await Video.findByIdAndDelete(videoId);
   return res
     .status(200)
-    .json(new ApiResponse(200, {}, "Video deleted successfully"));
+    .json(new ApiResponse(200, videoId, "Video deleted successfully"));
 });
 const togglePublishStatus = asyncHandler(async (req, res) => {
   const videoId = validateVideoId(req.params.videoId);
@@ -274,6 +274,7 @@ const togglePublishStatus = asyncHandler(async (req, res) => {
     { _id: new mongoose.Types.ObjectId(videoId), owner: userId }, //only owner can update
     //array for $set because this is an aggregation pipeline update (dynamic update)
     [
+      //when using fields like $isPublished we are using pipeline so we have to use $set inside [] not {}
       {
         $set: { isPublished: { $not: "$isPublished" } },
       },

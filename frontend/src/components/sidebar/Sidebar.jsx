@@ -6,7 +6,9 @@ import { Link } from 'react-router-dom';
 import { useAppSelector } from '../../app/hooks';
 import { useNavigate } from 'react-router-dom';
 import { MdOutlineVideoSettings } from "react-icons/md";
-
+import { AiFillLike } from "react-icons/ai";
+import { MdHistory } from "react-icons/md";
+import { CgPlayListSearch } from "react-icons/cg";
 
 export default function Sidebar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -38,6 +40,21 @@ export default function Sidebar() {
           label= "Manage My Videos"
           isOpen={isOpen}
           to="/myVideos"
+          />
+          <SidebarItems icon={<AiFillLike size={28} />}
+          label= "liked videos"
+          isOpen={isOpen}
+          to="/likedVideos"
+          />
+          <SidebarItems icon={<MdHistory size={28} />}
+          label= "history"
+          isOpen={isOpen}
+          to="/history"
+          />
+          <SidebarItems icon={<CgPlayListSearch size={28}/>}
+          label= "playlists"
+          isOpen={isOpen}
+          to="/playlists"
           />
       </div>
     </div>

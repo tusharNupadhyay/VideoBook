@@ -13,7 +13,11 @@ import {
   Upload,
   Profile,
   MyVideos,
-  EditPage
+  EditPage,
+  WatchHistory,
+  LikedVideos,
+  Playlists,
+  PlaylistDetails
 } from '../pages/index.js';
 // Protected wrapper
 import ProtectedRoute from './ProtectedRouter.jsx';
@@ -36,8 +40,12 @@ const AppRouter = createBrowserRouter([
           { path: 'upload', element: <Upload /> },
           { path: 'myVideos', element: <MyVideos /> },
            { path: 'myVideos/edit/:videoId', element: <EditPage /> },
+           { path: 'history', element: <WatchHistory /> },
+           { path: 'likedVideos', element: <LikedVideos /> },
+           {path: 'playlists', element: <Playlists />},
         ],
       },
+      { path: 'playlists/:playlistId', element: <PlaylistDetails /> },
       { path: 'channel/:username', element: <Channel /> },    
     ],
   },
