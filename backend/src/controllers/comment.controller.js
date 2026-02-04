@@ -20,106 +20,113 @@ const getVideoComments = asyncHandler(async (req, res) => {
   get total likes and dislikes for each comment,
   if user is logged in get userReaction which checks whether user has liked the comment or not
   */
-  const {
-    page = 1,
-    limit = 10,
-    // sortBy = "createdAt",
-    // sortType = "desc",
-  } = req.query;
+  const { page = 1, limit = 10 } = req.query;
 
   const videoId = validateId(req.params.videoId);
+
   const userId = req.user?._id || null;
   const pageNumber = parseInt(page) || 1;
   const limitNumber = parseInt(limit) || 10;
-  /*
-    const sortOrder = sortType === "asc" ? 1 : -1;
-    const sortStage = {
-      [sortBy]: sortOrder,
-    };
-    */
 
-  //fetch comments + owner
-  const comments = await Comment.aggregate([
+  const commentsAggregation = await Comment.aggregate([
+    // 1. Filter comments for the specific video
     { $match: { video: videoId } },
-    {
-      $lookup: {
-        from: "users",
-        localField: "owner",
-        foreignField: "_id",
-        as: "owner",
-      },
-    },
-    { $unwind: "$owner" },
-    {
-      $project: {
-        _id: 1,
-        content: 1,
-        createdAt: 1,
-        owner: {
-          _id: 1,
-          username: 1,
-          avatar: 1,
-        },
-      },
-    },
+
+    // 2. Sort by newest first
     { $sort: { createdAt: -1 } },
-    { $skip: (pageNumber - 1) * limitNumber },
-    { $limit: limitNumber },
-  ]);
 
-  //array of comment id's
-  const commentIds = comments.map((c) => c._id);
-
-  //Initialize reactionsMap with all comments (default 0/0/null)
-  const reactionsMap = {};
-  comments.forEach((c) => {
-    reactionsMap[c._id] = { likes: 0, dislikes: 0, userReaction: null };
-  });
-
-  //fetch likes and dislikes for all comments (* comments which have 0 likes or 0 dislikes will not be present in reactionstats)
-  const reactionStats = await Like.aggregate([
+    // 3. Use Facet to get Total Count and Paginated Data in one go
     {
-      $match: {
-        comment: { $in: commentIds },
-        value: { $in: [1, -1] },
+      $facet: {
+        metadata: [{ $count: "total" }],
+        data: [
+          { $skip: (pageNumber - 1) * limitNumber },
+          { $limit: limitNumber },
+
+          // Lookup Owner Details
+          {
+            $lookup: {
+              from: "users",
+              localField: "owner",
+              foreignField: "_id",
+              as: "owner",
+            },
+          },
+          { $unwind: "$owner" },
+
+          // Lookup Reactions for each comment
+          {
+            $lookup: {
+              from: "likes",
+              localField: "_id",
+              foreignField: "comment",
+              as: "reactions",
+            },
+          },
+
+          // Project the fields exactly how you want them
+          {
+            $project: {
+              _id: 1,
+              content: 1,
+              createdAt: 1,
+              owner: {
+                _id: 1,
+                username: 1,
+                avatar: 1,
+              },
+              // Calculate likes/dislikes count from the reactions array
+              likesCount: {
+                $size: {
+                  $filter: {
+                    input: "$reactions",
+                    as: "r",
+                    cond: { $eq: ["$$r.value", 1] },
+                  },
+                },
+              },
+              dislikesCount: {
+                $size: {
+                  $filter: {
+                    input: "$reactions",
+                    as: "r",
+                    cond: { $eq: ["$$r.value", -1] },
+                  },
+                },
+              },
+              // Find the specific reaction for the logged-in user
+              userReaction: {
+                $ifNull: [
+                  {
+                    $arrayElemAt: [
+                      {
+                        $filter: {
+                          input: "$reactions",
+                          as: "r",
+                          cond: { $eq: ["$$r.likedBy", userId] },
+                        },
+                      },
+                      0,
+                    ],
+                  },
+                  null,
+                ],
+              },
+            },
+          },
+        ],
       },
     },
-    {
-      $group: {
-        _id: "$comment",
-        likes: { $sum: { $cond: [{ $eq: ["$value", 1] }, 1, 0] } },
-        dislikes: { $sum: { $cond: [{ $eq: ["$value", -1] }, 1, 0] } },
-      },
-    },
   ]);
 
-  //update reactionStats with aggregated likes and dislikes
-  reactionStats.forEach((r) => {
-    reactionsMap[r._id].likes = r.likes;
-    reactionsMap[r._id].dislikes = r.dislikes;
-  });
-  if (userId) {
-    //fetch all the comments which user have liked if user is logged in
-    const userReactions = await Like.find({
-      comment: { $in: commentIds },
-      likedBy: userId,
-    }).select("comment value");
+  const totalComments = commentsAggregation[0].metadata[0]?.total || 0;
+  const comments = commentsAggregation[0].data;
 
-    //update the value in the reactionsMap
-    userReactions.forEach((r) => {
-      //r is a like document so r.comment is comment id
-      reactionsMap[r.comment].userReaction = r.value;
-    });
-  }
-
-  //now merge reactions into comments
+  // Clean up userReaction to just return the value (1, -1, or null)
   const finalComments = comments.map((c) => ({
     ...c,
-    reactions: reactionsMap[c._id],
+    userReaction: c.userReaction ? c.userReaction.value : null,
   }));
-
-  //total comment count for pagination
-  const totalComments = await Comment.countDocuments({ video: videoId });
 
   return res.status(200).json(
     new ApiResponse(
@@ -127,12 +134,109 @@ const getVideoComments = asyncHandler(async (req, res) => {
       {
         comments: finalComments,
         totalComments,
-        page,
-        totalPages: Math.ceil(totalComments / limit),
+        page: pageNumber,
+        totalPages: Math.ceil(totalComments / limitNumber),
+        hasNextPage: pageNumber * limitNumber < totalComments,
       },
-      "All comments fetched successfully"
+      "Comments fetched successfully"
     )
   );
+
+  // //fetch comments + owner
+  // const comments = await Comment.aggregate([
+  //   { $match: { video: videoId } },
+  //   {
+  //     $lookup: {
+  //       from: "users",
+  //       localField: "owner",
+  //       foreignField: "_id",
+  //       as: "owner",
+  //     },
+  //   },
+  //   { $unwind: "$owner" },
+  //   {
+  //     $project: {
+  //       _id: 1,
+  //       content: 1,
+  //       createdAt: 1,
+  //       owner: {
+  //         _id: 1,
+  //         username: 1,
+  //         avatar: 1,
+  //       },
+  //     },
+  //   },
+  //   { $sort: { createdAt: -1 } },
+  //   { $skip: (pageNumber - 1) * limitNumber },
+  //   { $limit: limitNumber },
+  // ]);
+
+  // //array of comment id's
+  // const commentIds = comments.map((c) => c._id);
+
+  // //Initialize reactionsMap with all comments (default 0/0/null)
+  // const reactionsMap = {};
+  // comments.forEach((c) => {
+  //   reactionsMap[c._id] = { likes: 0, dislikes: 0, userReaction: null };
+  // });
+
+  // //fetch likes and dislikes for all comments (* comments which have 0 likes or 0 dislikes will not be present in reactionstats)
+  // const reactionStats = await Like.aggregate([
+  //   {
+  //     $match: {
+  //       comment: { $in: commentIds },
+  //       value: { $in: [1, -1] },
+  //     },
+  //   },
+  //   {
+  //     $group: {
+  //       _id: "$comment",
+  //       likes: { $sum: { $cond: [{ $eq: ["$value", 1] }, 1, 0] } },
+  //       dislikes: { $sum: { $cond: [{ $eq: ["$value", -1] }, 1, 0] } },
+  //     },
+  //   },
+  // ]);
+
+  // //update reactionStats with aggregated likes and dislikes
+  // reactionStats.forEach((r) => {
+  //   reactionsMap[r._id].likes = r.likes;
+  //   reactionsMap[r._id].dislikes = r.dislikes;
+  // });
+  // if (userId) {
+  //   //fetch all the comments which user have liked if user is logged in
+  //   const userReactions = await Like.find({
+  //     comment: { $in: commentIds },
+  //     likedBy: userId,
+  //   }).select("comment value");
+
+  //   //update the value in the reactionsMap
+  //   userReactions.forEach((r) => {
+  //     //r is a like document so r.comment is comment id
+  //     reactionsMap[r.comment].userReaction = r.value;
+  //   });
+  // }
+
+  // //now merge reactions into comments
+  // const finalComments = comments.map((c) => ({
+  //   ...c,
+  //   reactions: reactionsMap[c._id],
+  // }));
+
+  // //total comment count for pagination
+  // const totalComments = await Comment.countDocuments({ video: videoId });
+
+  // return res.status(200).json(
+  //   new ApiResponse(
+  //     200,
+  //     {
+  //       comments: finalComments,
+  //       totalComments,
+  //       page,
+  //       totalPages: Math.ceil(totalComments / limit),
+  //     },
+  //     "All comments fetched successfully"
+  //   )
+  // );
 });
 const addComment = asyncHandler(async (req, res) => {
   // add a comment to a video
@@ -159,7 +263,7 @@ const editComment = asyncHandler(async (req, res) => {
   //edit a comment
   const { content } = req.body;
   const commentId = validateId(req.params.commentId);
-  const userId = req.user?._id
+  const userId = req.user?._id;
   if (!content?.trim()) {
     throw new ApiError(400, "Comment content cannot be empty");
   }

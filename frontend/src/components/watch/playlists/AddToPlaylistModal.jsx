@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { useAppDispatch, useAppSelector } from '../app/hooks';
+import { useAppDispatch, useAppSelector } from "../../../app/hooks.js";
 import { IoMdAdd } from 'react-icons/io';
 import {
   getMyPlaylists,
   addVideoToPlaylist,
   removeVideoFromPlaylist,
-} from '../features/playlists/playlistAction.js';
+} from "../../../features/playlists/playlistAction.js";
 
 export default function AddToPlaylistModal({ onClose, onCreateNew, videoId }) {
   const popupRef = useRef(null);

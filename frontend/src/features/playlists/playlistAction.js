@@ -51,7 +51,6 @@ export const createPlaylist = createAsyncThunk(
   async (data, { rejectWithValue }) => {
     try {
       const res = await api.post("/playlists",data);
-      console.log({res});
       return res.data.data;
     } catch (error) {
       return rejectWithValue(
@@ -66,7 +65,6 @@ export const addVideoToPlaylist = createAsyncThunk(
   async ({playlistId,videoId}, { rejectWithValue }) => {
     try {
       const res = await api.patch(`/playlists/${playlistId}/videos/add`,{videoId});
-      console.log({res});
       return res.data.data;
     } catch (error) {
       return rejectWithValue(
@@ -81,7 +79,6 @@ export const removeVideoFromPlaylist = createAsyncThunk(
   async ({playlistId,videoId}, { rejectWithValue }) => {
     try {
       const res = await api.patch(`/playlists/${playlistId}/videos/remove`,{videoId});
-      console.log({res});
       return res.data.data;
     } catch (error) {
       return rejectWithValue(
@@ -96,7 +93,6 @@ export const deletePlaylist = createAsyncThunk(
   async ({playlistId}, { rejectWithValue }) => {
     try {
       const res = await api.delete(`/playlists/${playlistId}`);
-      console.log({res});
       return res.data.data;
     } catch (error) {
       return rejectWithValue(
@@ -111,7 +107,7 @@ export const updatePlaylist = createAsyncThunk(
   async ({playlistId,data}, { rejectWithValue }) => {
     try {
       const res = await api.patch(`/playlists/${playlistId}`,data);
-      console.log({res});
+      
       return res.data.data;
     } catch (error) {
       return rejectWithValue(
@@ -125,7 +121,7 @@ export const togglePrivacy = createAsyncThunk('playlists/togglePrivacy',
   async({playlistId},{rejectWithValue}) => {
     try {
       const res = await api.patch(`/playlists/toggle/privacy/${playlistId}`);
-      console.log({res});
+      
       return res.data.data;
     } catch (error) {
       return rejectWithValue(

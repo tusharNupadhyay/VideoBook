@@ -6,7 +6,7 @@ export const uploadVideo = createAsyncThunk(
   async (data, { rejectWithValue }) => {
     try {
       const res = await api.post('/videos', data);
-      console.log(res.data?.message || 'video uploaded Successfully');
+      //TODO: update home videos page
       return res.data.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Upload failed');
@@ -27,11 +27,11 @@ export const fetchVideoById = createAsyncThunk('video/fetchVideoById',
 )
 //fetches all videos for homepage
 export const fetchAllVideos = createAsyncThunk('video/fetchAllVideos',
-  async(_,{rejectWithValue}) => {
+  async({ page = 1, limit = 12, query = '' },{rejectWithValue}) => {
     try {
-      const res = await api.get('/videos');
-      console.log(res.data.data);
-      return res.data.data.docs;
+      const res = await api.get(`/videos?page=${page}&limit=${limit}&query=${query}`);
+      // result from backend is: { videos: [...], totalVideos: X, currentPage: X, hasNextPage: true ,totalPages}
+      return res.data.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Cannot fetch all videos');
     }
@@ -68,10 +68,9 @@ export const getVideoReactions = createAsyncThunk(
 );
 
 //fetch channel videos throught username (PUBLIC)
-export const getChannelVideos = createAsyncThunk("video/getChannelVideos", async(username,{rejectWithValue})=>{
+export const getChannelVideos = createAsyncThunk("video/getChannelVideos", async({username,page=1,limit=12},{rejectWithValue})=>{
     try {
-      const res = await api.get(`/videos/channel/${username}`);
-      console.log(res.data.data);
+      const res = await api.get(`/videos/channel/${username}?page=${page}&limit=${limit}`);
       return res.data.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || "Failed to fetch Channel Videos");

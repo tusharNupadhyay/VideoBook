@@ -10,8 +10,9 @@ import {
   updateVideoDetails,
   getLikedVideos,
   getWatchHistory,
-  deleteVideo
+  deleteVideo,
 } from './videoAction';
+import { toggleSubscription } from '../user/userActions';
 
 const initialState = {
   // Delete Video states
@@ -20,8 +21,15 @@ const initialState = {
 
   // HOME PAGE VIDEOS
   homeVideos: [],
+  homePage: 1, 
+  hasNextHomePage: false,
   homeLoading: false,
   homeError: null,
+
+  //suggested videos in watch page
+  suggestedVideos: [],
+  suggestedPage: 1,
+  hasMoreSuggestions: true,
 
   // UPLOAD STATE
   uploadLoading: false,
@@ -62,6 +70,8 @@ const initialState = {
 
   // VIDEOS ON A USER CHANNEL (PUBLIC)
   channelVideos: [],
+  channelPage: 1,
+  hasNextChannelPage: false,
   channelLoading: false,
   channelError: null,
 
@@ -80,6 +90,34 @@ const videoSlice = createSlice({
   name: 'video',
   initialState,
   reducers: {
+    // Logic to shuffle and pick the first batch
+    initializeSuggestions: (state, action) => {
+      const currentVideoId = action.payload;
+      // Filter out the current video
+      const filtered = state.homeVideos.filter((v) => v._id !== currentVideoId);
+      // Shuffle the array
+      const shuffled = [...filtered].sort(() => 0.5 - Math.random());
+
+      state.suggestedVideos = shuffled.slice(0, 10); // First 10
+      state.suggestedPage = 1;
+      state.hasMoreSuggestions = shuffled.length > 10;
+    },
+    // Logic to load the next 10
+    loadMoreSuggestions: (state, action) => {
+      const currentVideoId = action.payload;
+      const filtered = state.homeVideos.filter((v) => v._id !== currentVideoId);
+
+      const start = state.suggestedPage * 10;
+      const end = start + 10;
+      const nextBatch = filtered.slice(start, end);
+
+      if (nextBatch.length > 0) {
+        state.suggestedVideos = [...state.suggestedVideos, ...nextBatch];
+        state.suggestedPage += 1;
+      }
+
+      state.hasMoreSuggestions = filtered.length > end;
+    },
     clearUploadError: (state) => {
       state.uploadError = null;
     },
@@ -87,6 +125,8 @@ const videoSlice = createSlice({
       state.channelVideos = [];
       state.channelError = null;
       state.channelLoading = false;
+      state.channelPage=1;
+      state.hasNextChannelPage =false;
     },
     resetUploadState: (state) => {
       state.uploadLoading = false;
@@ -149,8 +189,15 @@ const videoSlice = createSlice({
       })
       .addCase(fetchAllVideos.fulfilled, (state, action) => {
         state.homeLoading = false;
-        state.homeError = null;
-        state.homeVideos = action.payload;
+        const { videos, hasNextPage, currentPage } = action.payload;
+        if (currentPage === 1) {
+          state.homeVideos = videos;
+        } else {
+          state.homeVideos = [...state.homeVideos, ...videos];
+        }
+
+        state.hasNextHomePage = hasNextPage;
+        state.homePage = currentPage;
       })
       .addCase(fetchAllVideos.rejected, (state, action) => {
         state.homeLoading = false;
@@ -190,8 +237,15 @@ const videoSlice = createSlice({
       })
       .addCase(getChannelVideos.fulfilled, (state, action) => {
         state.channelLoading = false;
-        state.channelVideos = action.payload;
-        state.channelError = null;
+        const { videos, hasNextPage, currentPage } = action.payload;
+
+        if (currentPage === 1) {
+          state.channelVideos = videos;
+        } else {
+          state.channelVideos = [...state.channelVideos, ...videos];
+        }
+        state.hasNextChannelPage = hasNextPage;
+        state.channelPage = currentPage;
       })
       .addCase(getChannelVideos.rejected, (state, action) => {
         state.channelLoading = false;
@@ -236,11 +290,11 @@ const videoSlice = createSlice({
         state.watchHistory.loading = true;
         state.watchHistory.error = null;
       })
-      .addCase(getWatchHistory.fulfilled,(state,action) => {
+      .addCase(getWatchHistory.fulfilled, (state, action) => {
         state.watchHistory.loading = false;
         state.watchHistory.videos = action.payload.history;
       })
-      .addCase(getWatchHistory.rejected,(state,action)=> {
+      .addCase(getWatchHistory.rejected, (state, action) => {
         state.watchHistory.error = action.payload;
         state.watchHistory.loading = false;
       })
@@ -249,27 +303,38 @@ const videoSlice = createSlice({
         state.likedVideos.loading = true;
         state.likedVideos.error = null;
       })
-      .addCase(getLikedVideos.fulfilled,(state,action) => {
+      .addCase(getLikedVideos.fulfilled, (state, action) => {
         state.likedVideos.loading = false;
         state.likedVideos.videos = action.payload;
       })
-      .addCase(getLikedVideos.rejected,(state,action)=> {
+      .addCase(getLikedVideos.rejected, (state, action) => {
         state.likedVideos.error = action.payload;
         state.likedVideos.loading = false;
       })
       //Delete video
-      .addCase(deleteVideo.pending,(state) => {
+      .addCase(deleteVideo.pending, (state) => {
         state.deleteVideoLoading = true;
         state.deleteVideoError = null;
       })
-      .addCase(deleteVideo.fulfilled,(state,action)=>{
-        state.deleteVideoLoading =false;
-        state.myVideos.videos = state.myVideos.videos.filter(video => video._id !== action.payload);
-      })
-      .addCase(deleteVideo.rejected,(state,action)=>{
+      .addCase(deleteVideo.fulfilled, (state, action) => {
         state.deleteVideoLoading = false;
-        state.deleteVideoError = action.payload || "cannot delete video";
+        state.myVideos.videos = state.myVideos.videos.filter(
+          (video) => video._id !== action.payload
+        );
       })
+      .addCase(deleteVideo.rejected, (state, action) => {
+        state.deleteVideoLoading = false;
+        state.deleteVideoError = action.payload || 'cannot delete video';
+      })
+      //update subscription after user has subscribed
+      .addCase(toggleSubscription.fulfilled, (state, action) => {
+        if (state.singleVideo && state.singleVideo.owner) {
+          const isSubscribed = action.payload.subscribed;
+          state.singleVideo.owner.isSubscribed = isSubscribed;
+          if (isSubscribed) state.singleVideo.owner.subscribersCount += 1;
+          else state.singleVideo.owner.subscribersCount -= 1;
+        }
+      });
   },
 });
 
@@ -280,4 +345,6 @@ export const {
   resetUploadState,
   resetMyVideos,
   resetSingleVideo,
+  initializeSuggestions,
+  loadMoreSuggestions,
 } = videoSlice.actions;

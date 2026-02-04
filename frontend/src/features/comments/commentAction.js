@@ -3,11 +3,10 @@ import { createAsyncThunk } from '@reduxjs/toolkit';
 
 export const fetchCommentsByVideo = createAsyncThunk(
   'comment/fetchCommentsByVideo',
-  async (videoId, { rejectWithValue }) => {
+  async ({ videoId, page = 1 }, { rejectWithValue }) => {
     try {
-      const res = await api.get(`/comments/${videoId}`);
-      console.log('Fetched all the comments: ', res.data.data.comments);
-      return res.data.data.comments;
+      const res = await api.get(`/comments/${videoId}?page=${page}&limit=10`);
+      return res.data.data; // contains { comments, hasNextPage, page, totalComments }
     } catch (error) {
       return rejectWithValue(
         error.response?.data?.message || 'Cannot fetch comments for this video'
@@ -21,7 +20,7 @@ export const addComment = createAsyncThunk(
   async ({ videoId, commentText: content }, { rejectWithValue }) => {
     try {
       const res = await api.post(`/comments/${videoId}`, { content });
-      console.log('Comment added ', res.data.data);
+      
       return res.data.data;
     } catch (error) {
       return rejectWithValue(
@@ -78,9 +77,9 @@ export const toggleCommentReaction = createAsyncThunk(
 
 export const editComment = createAsyncThunk(
   'comment/editComment',
-  async ({commentId,content}, { rejectWithValue }) => {
+  async ({ commentId, content }, { rejectWithValue }) => {
     try {
-      const res = await api.patch(`/comments/id/${commentId}`,{content});
+      const res = await api.patch(`/comments/id/${commentId}`, { content });
       return res.data.data;
     } catch (error) {
       return rejectWithValue(

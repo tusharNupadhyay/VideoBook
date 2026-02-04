@@ -132,6 +132,7 @@ const loginUser = asyncHandler(async (req, res) => {
     secure: isProduction, //cookies sent only over https not http
     //secure: true may prevent cookies from being set, so use secure: process.env.NODE_ENV = "production"
     sameSite: isProduction ? "none" : "lax",
+    path:'/',
   };
   return res
     .status(200)
@@ -152,7 +153,13 @@ const logOutUser = asyncHandler(async (req, res) => {
 
   await User.findByIdAndUpdate(req.user._id, { $unset: { refreshToken: 1 } }); //1 is ignored,you can use anything("",true,1)
 
-  const options = { httpOnly: true, secure: true };
+  const isProduction = process.env.NODE_ENV === "production";
+  const options = {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
+    path: "/",
+  };
   return res
     .status(200)
     .clearCookie("accessToken", options)
@@ -179,7 +186,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
       httpOnly: true,
       secure: isProduction,
       sameSite: isProduction ? "none" : "lax",
-    };
+      path: '/',    };
     const { accessToken, refreshToken: newRefreshToken } =
       await generateAccessRefreshTokens(user._id);
 
@@ -216,21 +223,27 @@ const getCurrentUser = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, req.user, "current user fetched successfully"));
 });
 const updateAccountDetails = asyncHandler(async (req, res) => {
-  const { fullName, email } = req.body;
-  if (!fullName.trim() || !email.trim())
-    throw new ApiError(400, "All fields are required");
+  const { fullName, email,username } = req.body;
+
+  const updatedObject = {};
+  if(fullName?.trim()) updatedObject.fullName = fullName.trim();
+  if(email?.trim()) updatedObject.email = email.trim();
+  if(username?.trim()) updatedObject.username = username.trim();
+
+  //if nothing to update
+    if (Object.keys(updatedObject).length === 0)
+      throw new ApiError(400, "No valid fields provided for update");
 
   //new: true returns updated information
   const user = await User.findByIdAndUpdate(
     req.user?._id,
     {
-      $set: {
-        fullName,
-        email: email,
-      },
+      $set: updatedObject,
     },
     { new: true }
   ).select("-password");
+
+  if (!user) throw new ApiError(403, "failed to update");
   return res
     .status(200)
     .json(new ApiResponse(200, user, "Account details updated successfully"));
@@ -382,7 +395,7 @@ const buildChannelProfilePipeline = (userId) => [
   {
     //get total subscribers of channel
     $lookup: {
-      from: "subscribers",
+      from: "subscriptions",
       let: { channelId: "$_id" },
       as: "subscriberCount",
       pipeline: [
@@ -432,7 +445,7 @@ const getChannelProfile = asyncHandler(async (req, res) => {
     pipeline.push(
       {
         $lookup: {
-          from: "subscribers",
+          from: "subscriptions",
           let: {
             channelId: "$_id", //_id is from current document (outer collection)
             userId: userId,
@@ -501,7 +514,7 @@ const getMyProfile = asyncHandler(async (req, res) => {
   pipeline.push(
     {
       $lookup: {
-        from: "subscribers",
+        from: "subscriptions",
         let: { userId: "$_id" },
         as: "subscribedChannels",
         pipeline: [
@@ -524,7 +537,7 @@ const getMyProfile = asyncHandler(async (req, res) => {
           },
           {
             $project: {
-              _id: 0,
+              _id: "$channelInfo._id",
               username: "$channelInfo.username",
               avatar: "$channelInfo.avatar",
             },

@@ -2,8 +2,8 @@ import { useRef, useEffect, useState } from 'react';
 import {
   createPlaylist,
   addVideoToPlaylist,
-} from '../features/playlists/playlistAction';
-import { useAppDispatch, useAppSelector } from '../app/hooks';
+} from '../../../features/playlists/playlistAction';
+import { useAppDispatch, useAppSelector } from '../../../app/hooks';
 
 export default function CreatePlaylistModal({ onClose, videoId }) {
   const popupRef = useRef(null); // to close the popupModal when clicked outside,ref stores the popup dom element

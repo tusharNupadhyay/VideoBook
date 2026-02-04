@@ -4,13 +4,13 @@ import Sidebar from '../components/sidebar/Sidebar.jsx';
 
 
 export default function MainLayout() {
-
+ 
   return (
-    <div className="flex min-h-screen overflow-hidden">
+    <div className="flex min-h-screen bg-neutral-900">
       <Sidebar />
-      <div className="flex flex-col flex-1 overflow-hidden ml-20">
+      <div className="flex flex-col flex-1 min-w-0 ml-20">
         <Navbar />
-        <main className='flex flex-1 overflow-y-auto bg-gray-100'>
+        <main className="flex flex-col flex-1 bg-neutral-900">
         <Outlet />
         </main>
       </div>

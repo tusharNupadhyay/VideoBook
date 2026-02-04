@@ -1,6 +1,6 @@
 import { useAppSelector, useAppDispatch } from '../../app/hooks.js';
 import { logoutUser } from '../../features/auth/authActions.js';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import {
   resetMyProfile,
   resetChannelProfile,
@@ -15,83 +15,96 @@ import {
   clearError,
   clearSuccess,
 } from '../../features/auth/authSlice.js';
-import { useState } from 'react';
+import { useState,useEffect,useRef } from 'react';
 import { IoIosSearch } from 'react-icons/io';
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
+  const menuRef = useRef(null);
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const { userInfo } = useAppSelector((state) => state.auth);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handler = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      //unwrap() turns the thunk action into a real Promise
+      //If the thunk succeeds → returns the actual payload (not the whole action)
+      //If the thunk fails → it throws an error that we can catch in try/catch
+      //This makes error handling and success flows much cleaner.
+      await dispatch(logoutUser()).unwrap();
+      dispatch(logout());
+      dispatch(resetMyProfile());
+      dispatch(resetChannelProfile());
+      dispatch(resetChannelVideos());
+      dispatch(resetUploadState());
+      dispatch(resetMyVideos());
+      setOpen(false);
+      navigate('/');
+    } catch (err) {
+      console.error('Logout failed:', err);
+    }
+  };
   
   return (
-    <nav className=" bg-gray-200 shadow flex items-center justify-between gap-1 px-12 py-2">
-      <p className="px-4 py-2 font-semibold text-gray-700 ">VideoBook</p>
-      <div className="flex flex-1 mx-6 max-w-xl  rounded ">
+   <nav className="sticky top-0 z-50 bg-[#0f0f0f] border-b border-white/10 flex items-center justify-between px-4 md:px-12 py-2 gap-4">
+      {/* Logo */}
+      <Link to="/" className="text-xl font-bold text-white tracking-tighter shrink-0">
+        VideoBook
+      </Link>
+
+      {/* Search Bar */}
+      <div className="flex flex-1 max-w-2xl group">
         <input
           type="text"
-          placeholder="search"
-          className="focus:outline-none focus:ring-2 focus:ring-gray-600 mr-1  rounded flex-1 px-4 py-2 bg-slate-300"
+          placeholder="Search"
+          className="w-full bg-neutral-900 border border-neutral-800 text-white px-4 py-2 rounded-l-full focus:outline-none focus:border-blue-500 transition"
         />
-        <button className="px-4 py-2 bg-gray-400 hover:bg-gray-500 rounded cursor-pointer">
+        <button className="px-5 bg-neutral-800 border border-l-0 border-neutral-800 rounded-r-full hover:bg-neutral-700 transition cursor-pointer text-xl text-white">
           <IoIosSearch />
         </button>
       </div>
 
-      <div className="relative text-left px-2">
+      {/* Auth Actions */}
+      <div className="relative" ref={menuRef}>
         {userInfo ? (
-          <button
-            className={`flex rounded cursor-pointer items-center gap-2 px-4 py-1 hover:bg-gray-300 focus:outline-none ${open ? 'bg-gray-300 focus:ring-2 focus:ring-gray-500 ' : 'bg-gray-200'}`}
-            onClick={() => setOpen(!open)}
-          >
-            <img
-              src={userInfo.avatar}
-              className="h-8 w-8 rounded-full"
-              alt="user"
-            />
-            <span className="hidden sm:block">{userInfo?.username}</span>
+          <div className="flex items-center">
+            <button
+              onClick={() => setOpen(!open)}
+              className="flex items-center focus:outline-none hover:ring-2 hover:ring-white/20 rounded-full transition"
+            >
+              <img src={userInfo.avatar} className="h-9 w-9 rounded-full object-cover" alt="avatar" />
+            </button>
 
             {open && (
-              <div className="absolute gap-2 flex flex-col px-2 py-1 top-full mt-2 w-48 rounded-md bg-gray-100 shadow-lg left-1/2 -translate-x-1/2 transition-">
-                <DropDownItem
-                  label={'My Profile'}
-                  link={'/profile'}
-                />
-                <DropDownItem
-                  label={'Logout'}
-                  link={'/logout'}
-                />
-                <DropDownItem
-                  label={'upload'}
-                  link={'/upload'}
-                />
+              <div className="absolute right-0 top-full mt-3 w-56 bg-neutral-900 border border-neutral-800 rounded-xl shadow-2xl py-2 overflow-hidden">
+                <div className="px-4 py-3 border-b border-neutral-800 mb-1">
+                  <p className="text-sm font-semibold text-white truncate">{userInfo.username}</p>
+                  <p className="text-xs text-neutral-400 truncate">{userInfo.email}</p>
+                </div>
+                
+                <DropDownItem label="My Profile" onClick={() => { navigate('/profile'); setOpen(false); }} />
+                <DropDownItem label="Upload Video" onClick={() => { navigate('/upload'); setOpen(false); }} />
+                <DropDownItem label="Logout" variant="danger" onClick={handleLogout} />
               </div>
             )}
-          </button>
+          </div>
         ) : (
-          // If user is NOT logged in
-          <div className="flex gap-4">
-            <button
-              onClick={() => {
-                dispatch(clearError());
-                dispatch(clearSuccess());
-                navigate('/auth/login');
-              }}
-              className="px-4 py-2 bg-blue-600 text-white rounded-4xl transition hover:bg-blue-800"
+          <div className="flex gap-2">
+            <Link 
+              to="/auth/login" 
+              className="px-4 py-2 text-blue-500 hover:bg-blue-500/10 rounded-full text-sm font-semibold transition"
             >
-              Login
-            </button>
-
-            <button
-              onClick={() => {
-                dispatch(clearError());
-                dispatch(clearSuccess());
-                navigate('/auth/register');
-              }}
-              className="px-4 py-2 bg-blue-600 text-white rounded-4xl hover:bg-blue-800"
-            >
-              Register
-            </button>
+              Sign In
+            </Link>
           </div>
         )}
       </div>
@@ -99,44 +112,14 @@ export default function Navbar() {
   );
 }
 
-function DropDownItem({ label, link }) {
-  const navigate = useNavigate();
-  const dispatch = useAppDispatch();
-  const handleLogout = async () => {
-    try {
-      await dispatch(logoutUser()).unwrap(); //logout from backend
-      //unwrap() turns the thunk action into a real Promise
-      //If the thunk succeeds → returns the actual payload (not the whole action)
-      //If the thunk fails → it throws an error that we can catch in try/catch
-      //This makes error handling and success flows much cleaner.
-      dispatch(logout()); //clears auth slice
-
-      dispatch(resetMyProfile()); //clear user stats slice
-      dispatch(resetChannelProfile());
-
-      dispatch(resetChannelVideos());
-      dispatch(resetUploadState());
-      dispatch(resetMyVideos());
-      navigate('/');
-    } catch (err) {
-      console.log('Logout failed:', err);
-      navigate('/');
-    }
-  };
+function DropDownItem({ label, onClick, variant = 'default' }) {
+  const colors = variant === 'danger' ? 'text-red-500 hover:bg-red-500/10' : 'text-neutral-300 hover:bg-white/10';
   return (
-    <div className="block w-full px-4 py-2 text-left text-sm hover:bg-gray-300"
-      onClick={() => {
-        if(link=='/logout')
-        {
-          handleLogout();
-        }
-
-        else
-        navigate(link);
-        
-      }}
+    <button
+      onClick={onClick}
+      className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${colors}`}
     >
-      <p>{label}</p>
-    </div>
+      {label}
+    </button>
   );
 }

@@ -50,7 +50,18 @@ const initialState = {
 const playlistSlice = createSlice({
   name: 'playlist',
   initialState,
-  reducers: {},
+  reducers: {
+    resetCurrentPlaylist: (state) => {
+      state.currentPlaylist = null;
+      state.pagination.currentPlaylist =
+        initialState.pagination.currentPlaylist;
+    },
+    resetchannelPlaylist: (state) => {
+      state.channelPlaylists = initialState.channelPlaylists;
+      state.pagination.channelPlaylists =
+        initialState.pagination.channelPlaylists;
+    },
+  },
   extraReducers: (builder) => {
     builder
       //logout
@@ -195,7 +206,7 @@ const playlistSlice = createSlice({
           // only update the playlist field, keep videos and pagination
           state.currentPlaylist = {
             ...state.currentPlaylist,
-            playlist: {...updatedPlaylist},//new object reference so the page rerenders after updating
+            playlist: { ...updatedPlaylist }, //new object reference so the page rerenders after updating
           };
         }
 
@@ -204,7 +215,7 @@ const playlistSlice = createSlice({
         );
 
         if (index !== -1) {
-          state.playlists[index] = {...updatedPlaylist}; // new reference
+          state.playlists[index] = { ...updatedPlaylist }; // new reference
         }
       })
       .addCase(updatePlaylist.rejected, (state, action) => {
@@ -247,3 +258,4 @@ const playlistSlice = createSlice({
 });
 
 export default playlistSlice.reducer;
+export const { resetchannelPlaylist, resetCurrentPlaylist } = playlistSlice.actions;

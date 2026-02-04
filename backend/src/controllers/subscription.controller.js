@@ -33,7 +33,7 @@ const toggleSubscription = asyncHandler(async (req, res) => {
     await isSubscribed.deleteOne();
     return res
       .status(200)
-      .json(new ApiResponse(200, {}, "You have unsubscribed the channel"));
+      .json(new ApiResponse(200, {subscribed: false}, "You have unsubscribed the channel"));
   }
   //if you are not subscribed create the subscription document and return
   await Subscription.create({
@@ -42,7 +42,7 @@ const toggleSubscription = asyncHandler(async (req, res) => {
   });
   return res
     .status(200)
-    .json(new ApiResponse(200, {}, "You have subscribed the channel"));
+    .json(new ApiResponse(200, {subscribed: true}, "You have subscribed the channel"));
 });
 const getSubscribersOfChannel = asyncHandler(async (req, res) => {
   const channelId = validateId(req.params.channelId);

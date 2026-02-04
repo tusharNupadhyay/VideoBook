@@ -5,10 +5,10 @@ import {
   getChannelVideos,
 } from '../features/video/videoAction.js';
 import {
-  VideoCard,
   ProfileHeader,
   ProfileVideos,
 } from '../components/index.js';
+import { resetChannelVideos } from '../features/video/videoSlice.js';
 
 export function Profile() {
   const dispatch = useAppDispatch();
@@ -17,17 +17,23 @@ export function Profile() {
     (state) => state.user
   );
 
-  const { channelVideos, channelLoading, channelError } = useAppSelector(
+  const { channelVideos, channelLoading, channelError,hasNextChannelPage, 
+    channelPage, } = useAppSelector(
     (state) => state.video
   );
   const { userInfo } = useAppSelector((state) => state.auth);
+  const username = userInfo?.username;
 
   // Fetch channel stats only when the profile page loads AND userInfo exists.
   useEffect(() => {
     if (userInfo) {
       dispatch(getMyProfile());
-      dispatch(getChannelVideos(userInfo.username));
+      dispatch(getChannelVideos({ username, page: 1 }));//initial load
     }
+    // CLEANUP: This only runs when the user leaves the Profile page
+    return () => {
+      dispatch(resetChannelVideos()); 
+    };
   }, [userInfo, dispatch]);
 
   if (myProfileError || channelError) {
@@ -37,16 +43,27 @@ export function Profile() {
       </div>
     );
   }
-  if (myProfileLoading || channelLoading) {
-    return <div className="text-white">Loading profile...</div>;
-  }
+ if (myProfileLoading && !myProfile) {
+  return <div className="text-white p-10">Loading profile details...</div>;
+}
 
-  const videoArray = channelVideos?.[0]?.videos;
+//  Don't show full-page loader if we already have some videos
+if (channelLoading && channelVideos.length === 0) {
+  return <div className="text-white p-10">Loading videos...</div>;
+}
+
+  console.log({channelVideos});
 
   return (
     <div className="flex flex-col gap-2 flex-1">
       <ProfileHeader userDetails={myProfile} />
-      <ProfileVideos videos={videoArray} />
+      <ProfileVideos 
+        videos={channelVideos} 
+        loading={channelLoading} 
+        hasNextPage={hasNextChannelPage}
+        page={channelPage}
+        username={username}
+      />
     </div>
   );
 }

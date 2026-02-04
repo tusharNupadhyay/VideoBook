@@ -7,8 +7,6 @@ export const registerUser = createAsyncThunk(
   async (formData, { rejectWithValue }) => {
     try {
       const res = await api.post('/users/register', formData);
-      console.log(res.data?.message || 'registered Successfully');
-      console.log(res.data);
       return res.data?.message;
     } catch (error) {
       //return custom error msg from backend if present

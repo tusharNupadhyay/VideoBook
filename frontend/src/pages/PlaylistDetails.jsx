@@ -6,7 +6,8 @@ import VideoCard from './VideoCard';
 import PlaylistMenu from '../components/playlist/PlaylistMenu';
 import EditPlaylistModal from './EditPlaylistModal';
 import ConfirmPlaylistDelete from './ConfirmPlaylistDelete';
-import { FaPlay } from "react-icons/fa";
+import { FaPlay } from 'react-icons/fa';
+import { resetCurrentPlaylist } from '../features/playlists/playlistSlice';
 
 function PlaylistDetails() {
   const { playlistId } = useParams();
@@ -15,24 +16,23 @@ function PlaylistDetails() {
   const currentPlaylist = useAppSelector(
     (state) => state.playlist.currentPlaylist
   );
-  const loading = useAppSelector(
-    (state) => state.playlist.loading
-  );
-  const error = useAppSelector(
-    (state) => state.playlist.error
-  );
+  const loading = useAppSelector((state) => state.playlist.loading);
+  const error = useAppSelector((state) => state.playlist.error);
   const { userInfo } = useAppSelector((state) => state.auth);
 
   //for playlist edit modal
-  const [isOpen,setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
   // confirm playlist delete modal
-  const [isDelete,setIsDelete] = useState(false);
+  const [isDelete, setIsDelete] = useState(false);
 
   useEffect(() => {
     dispatch(getPlaylistById({ playlistId }));
+    return () => {
+      dispatch(resetCurrentPlaylist());
+    };
   }, [playlistId, dispatch]);
 
-  if (loading.fetch) {
+  if (loading.fetch || !currentPlaylist?.playlist?.owner) {
     return (
       <div className="flex-1 p-6 text-white">
         <div className="h-40 bg-white/10 rounded-xl animate-pulse" />
@@ -46,8 +46,22 @@ function PlaylistDetails() {
     );
   }
 
-  if (!currentPlaylist) return null; // to avoid cannot read properties of null
-  const isOwner = currentPlaylist.playlist.owner?._id === userInfo?._id;
+  const isOwner = currentPlaylist?.playlist?.owner?._id === userInfo?._id;
+
+  // Logic: If it's private and I'm NOT the owner, show an error
+  const isPrivate = currentPlaylist?.privacy === 'private';
+  if (isPrivate && !isOwner) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[60vh]">
+        <IoLockClosedOutline size={60} className="text-gray-500 mb-4" />
+        <h2 className="text-xl font-bold">This playlist is private</h2>
+        <p className="text-gray-400">
+          You do not have permission to view this content.
+        </p>
+      </div>
+    );
+  }
+
   const { playlist, videos, pagination } = currentPlaylist;
   return (
     <div className="flex-1 p-6 text-white bg-black/90 flex flex-col gap-8">
@@ -55,10 +69,10 @@ function PlaylistDetails() {
       <div className="flex flex-col md:flex-row gap-6">
         {/* Cover */}
         <div className="relative w-full md:w-72 aspect-video bg-gray-700 rounded-xl overflow-hidden shrink-0">
-          {playlist.coverImage ? (
+          {playlist?.coverImage ? (
             <img
-              src={playlist.coverImage}
-              alt={playlist.name}
+              src={playlist?.coverImage}
+              alt={playlist?.name}
               className="w-full h-full object-cover"
             />
           ) : (
@@ -70,15 +84,11 @@ function PlaylistDetails() {
 
         {/* Info */}
         <div className="flex justify-between gap-4 w-full relative">
-          <div className='flex flex-col justify-around'>
-            <h1 className="text-2xl font-bold">
-              {playlist.name}
-            </h1>
-            <p className="text-gray-400">
-              videos: {pagination.total}
-            </p>
+          <div className="flex flex-col justify-around">
+            <h1 className="text-2xl font-bold">{playlist.name}</h1>
+            <p className="text-gray-400">videos: {pagination?.total}</p>
             <p className="text-sm text-gray-500">
-              By {playlist.owner.username}
+              By {playlist?.owner?.username}
             </p>
 
             <span
@@ -88,7 +98,7 @@ function PlaylistDetails() {
                   : ' text-green-400'
               }`}
             >
-              {playlist.privacy}
+              {playlist?.privacy}
             </span>
           </div>
           {isOwner && (
@@ -103,8 +113,18 @@ function PlaylistDetails() {
               }}
             />
           )}
-          {isOwner && isOpen && (<EditPlaylistModal playlist={playlist} onClose={()=> setIsOpen(false)}/>)}
-            {isOwner && isDelete && (<ConfirmPlaylistDelete playlistId={playlist._id} onClose={()=> setIsDelete(false)} />)}
+          {isOwner && isOpen && (
+            <EditPlaylistModal
+              playlist={playlist}
+              onClose={() => setIsOpen(false)}
+            />
+          )}
+          {isOwner && isDelete && (
+            <ConfirmPlaylistDelete
+              playlistId={playlist._id}
+              onClose={() => setIsDelete(false)}
+            />
+          )}
         </div>
       </div>
 
@@ -117,7 +137,7 @@ function PlaylistDetails() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {videos.map((video) => (
-              <VideoCard key={video._id} video={video} />
+              <VideoCard key={video?._id} video={video} />
             ))}
           </div>
         )}

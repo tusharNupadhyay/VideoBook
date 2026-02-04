@@ -9,11 +9,12 @@ import Tweets from "./Tweets";
 import Upload from "./Upload";
 import Watch from "./Watch";
 import MyVideos from "./MyVideos";
-import EditPage from "./EditPage";
+import EditVideosPage from "./EditVideosPage";
 import LikedVideos from "./likedVideos";
 import WatchHistory from "./WatchHistory";
 import PlaylistDetails from "./PlaylistDetails";
+import EditProfile from "./EditProfile";
 
 export{Channel,ErrorPage,Home,Login,Playlists,Profile,Register,Tweets,Upload,
-    Watch,MyVideos,EditPage,LikedVideos,WatchHistory,PlaylistDetails
+    Watch,MyVideos,EditVideosPage,LikedVideos,WatchHistory,PlaylistDetails,EditProfile
 }

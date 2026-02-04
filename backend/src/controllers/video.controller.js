@@ -14,75 +14,66 @@ const validateVideoId = (id) => {
   if (!id) throw new ApiError(400, "Id is missing");
   if (!mongoose.Types.ObjectId.isValid(id))
     throw new ApiError(400, "Invalid ID");
-  return id;
+  return new mongoose.Types.ObjectId(id);
 };
 const getAllVideos = asyncHandler(async (req, res) => {
   // get all videos for Home Page of application
   const {
     page = 1,
-    limit = 10,
+    limit = 12,
     query,
-    sortBy = "createdAt",
-    sortType = "desc",
     userId,
   } = req.query; //data comes from URL query string (after ?) used for filtering, searching ,pagination
   const pageNumber = parseInt(page) || 1;
-  const limitNumber = parseInt(limit) || 10;
+  const limitNumber = parseInt(limit) || 12;
   const matchStage = {};
+
   //Search inside title field for the text stored in query,options: "i" means ignoring uppercase/lowercase differences.
-  if (query) matchStage.title = { $regex: query.trim(), $options: "i" };
+  // Handle Search Query
+  if (query) {
+    matchStage.$or = [
+      { title: { $regex: query.trim(), $options: "i" } },
+      { description: { $regex: query.trim(), $options: "i" } }
+    ];
+  }
 
-  const sortOrder = sortType === "asc" ? 1 : -1; // 1 for small to big and -1 for big to small
-  const sortStage = {
-    //brackets [] allow dynamic property names
-    [sortBy]: sortOrder,
-  };
-
+ // 2. Handle User Filtering (Channel Videos)
   if (userId && mongoose.Types.ObjectId.isValid(userId)) {
     matchStage.owner = new mongoose.Types.ObjectId(userId);
   }
 
+  // 3. Only show published videos for the Home Page
+  if (!userId) {
+    matchStage.isPublished = true;
+  }
   const pipeline = [
-    {
-      $match: matchStage,
-    },
-
+    { $match: matchStage },
     {
       $lookup: {
         from: "users",
         localField: "owner",
         foreignField: "_id",
         as: "ownerDetails",
+        pipeline: [
+          { $project: { username: 1, avatar: 1 } } // Only pull what you need
+        ]
       },
     },
-    {
-      $unwind: "$ownerDetails", //removes array wrapper from ownerDetails
-    },
-    {
-      $sort: sortStage,
-    },
+    { $unwind: "$ownerDetails" },
+    { $sort: { createdAt: -1 } },
     {
       $project: {
         title: 1,
-        description: 1,
         thumbnail: 1,
-        viewCount: {
-          //this method is fine for small scale but for bigger scale storing userId inside array is not optimal
-          $size: {
-            $ifNull: ["$views", []],
-          },
-        },
         duration: 1,
-        isPublished: 1,
         createdAt: 1,
-        updatedAt: 1,
-        owner: {
-          username: "$ownerDetails.username",
-          avatar: "$ownerDetails.avatar",
-        },
+        owner: "$ownerDetails",
+        // Using $size on the views array
+        viewCount: { $size: { $ifNull: ["$views", []] } },
       },
     },
   ];
+
   const options = {
     page: pageNumber,
     limit: limitNumber,
@@ -94,7 +85,13 @@ const getAllVideos = asyncHandler(async (req, res) => {
   // console.log(result);
   return res
     .status(200)
-    .json(new ApiResponse(200, result, "All videos fetched successfully"));
+    .json(new ApiResponse(200, {
+        videos: result.docs,
+        totalVideos: result.totalDocs,
+        hasNextPage: result.hasNextPage,
+        currentPage: result.page,
+        totalPages: result.totalPages
+      }, "All videos fetched successfully"));
 });
 
 const getAllUserVideos = asyncHandler(async (req, res) => {
@@ -139,7 +136,7 @@ const publishVideo = asyncHandler(async (req, res) => {
     title,
     description,
     owner: req.user._id,
-  });
+  }).select("-videoFile -description ")
   if (!uploadedVideo)
     throw new ApiError(
       500,
@@ -163,10 +160,6 @@ const getVideoById = asyncHandler(async (req, res) => {
           views: userId,
         },
       },
-      {
-        //return updated document
-        new: true,
-      }
     );
     //mongodb does not allow push and pull on the same field in one query so query it twice
     // Remove if already exists
@@ -184,19 +177,64 @@ const getVideoById = asyncHandler(async (req, res) => {
       },
     });
   }
-  const video = await Video.findById(videoId).populate(
-    "owner",
-    "username avatar"
-  );
-  if (!video || video.length === 0) throw new ApiError(404, "Video not found");
-
-  const viewCount = video.views?.length || 0;
+  const videoDetails = await Video.aggregate([
+    {$match: {_id: videoId}},
+    //owner details
+    {$lookup:{
+      from:"users",
+      localField: "owner",
+      foreignField: "_id",
+      as: "owner",
+      pipeline: [
+        //lookup subscribers
+        {$lookup:{
+          from: "subscriptions",
+          localField: "_id",
+          foreignField: "channel",
+          as: "subscribers"
+        }},
+        {
+          $addFields:{
+            subscribersCount: {$size: "$subscribers"},
+            isSubscribed: {
+              $cond: {
+                //if userId exists and is found in subscribers array 
+                if: {
+                  $and:[
+                    {$ne: [userId,null]}, //true if userId is not equal to null
+                    {$in: [userId,"$subscribers.subscriber"]}
+                  ]
+                },
+                then: true,
+                else: false,
+              }
+            }
+          }
+        },
+        {
+          $project:{
+            username: 1,
+            avatar: 1,
+            subscribersCount: 1,
+            isSubscribed: 1,
+          }
+        }
+      ],
+    }},
+    {
+      $unwind: "$owner"
+    },
+    {
+      $addFields: {viewCount: {$size: {$ifNull: ["$views",[]]}}}
+    }
+  ]);
+  if(!videoDetails.length) throw new ApiError(404,"video not found");
   return res
     .status(200)
     .json(
       new ApiResponse(
         200,
-        { ...video.toObject(), viewCount },
+        videoDetails[0],
         "Video fetched successfully"
       )
     );
@@ -299,36 +337,37 @@ const getChannelVideos = asyncHandler(async (req, res) => {
   //Public method to get channel videos using username params
   const { username } = req.params;
   //pagination
-  const page = Number(req.query.page) || 1;
-  const limit = Number(req.query.limit) || 12;
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 12;
   const skip = (page - 1) * limit;
 
   const channel = await User.findOne({ username }).select("_id");
   if (!channel) throw new ApiError(404, "channel not found");
 
-  const videos = await Video.aggregate([
+  const results = await Video.aggregate([
     {
       $match: { owner: channel._id, isPublished: true },
     },
-    {
-      $lookup: {
-        from: "users",
-        localField: "owner",
-        foreignField: "_id",
-        as: "ownerDetails",
-      },
-    },
-    {
-      $unwind: "$ownerDetails",
-    },
+    // Sort, skip, and limit before the lookup
+    { $sort: { createdAt: -1 } },
     {
       $facet: {
-        videos: [
-          {
-            $sort: { createdAt: -1 },
-          },
+        videoData: [
+      
           { $skip: skip },
           { $limit: limit },
+          {
+            $lookup: {
+              from: "users",
+              localField: "owner",
+              foreignField: "_id",
+              as: "owner",
+              pipeline: [
+                {$project: {username: 1, avatar: 1}}
+              ]
+            }
+          },
+          {$unwind: "$owner"},
           {
             $project: {
               title: 1,
@@ -337,20 +376,25 @@ const getChannelVideos = asyncHandler(async (req, res) => {
               createdAt: 1,
               viewCount: { $size: { $ifNull: ["$views", []] } },
               duration: 1,
-              owner: {
-                username: "$ownerDetails.username",
-                avatar: "$ownerDetails.avatar",
-              },
+              owner:1,
             },
           },
         ],
-        total: [{ $count: "count" }],
+        totalCount: [{ $count: "count" }],
       },
     },
   ]);
+  const videos = results[0]?.videoData || [];
+  const totalVideos = results[0]?.totalCount[0]?.count || 0;
   return res
     .status(200)
-    .json(new ApiResponse(200, videos, "Channel videos fetched"));
+    .json(new ApiResponse(200,{
+        videos,
+        totalVideos,
+        currentPage: page,
+        hasNextPage: page * limit < totalVideos,
+        totalPages: Math.ceil(totalVideos / limit)
+      }, "Channel videos fetched"));
 });
 
 const getMyVideos = asyncHandler(async (req, res) => {

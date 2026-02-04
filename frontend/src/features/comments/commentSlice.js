@@ -12,6 +12,12 @@ const initialState = {
   comments: [], //  if i store this as null then i have to check every time if(comments &&
   commentsLoading: false,
   commentsError: null,
+
+  // Pagination State
+  page: 1,
+  hasNextPage: false,
+  totalComments: 0,
+
   addCommentLoading: false,
   addCommentError: null,
   deleteCommentLoading: false,
@@ -27,17 +33,7 @@ const commentSlice = createSlice({
   initialState,
   reducers: {
     clearComments: (state) => {
-      state.comments = [];
-      state.commentsLoading = false;
-      state.commentsError = null;
-
-      state.addCommentLoading = false;
-      state.addCommentError = null;
-
-      state.deleteCommentLoading = false;
-      state.deleteCommentError = null;
-
-      state.commentActionLoadingById = {};
+      return initialState; // Faster way to reset everything
     },
   },
   extraReducers: (builder) => {
@@ -48,8 +44,20 @@ const commentSlice = createSlice({
         state.commentsError = null;
       })
       .addCase(fetchCommentsByVideo.fulfilled, (state, action) => {
-        state.comments = action.payload;
+        const { comments, hasNextPage, page, totalComments } = action.payload;
+
+        // If it's page 1, start fresh. Otherwise, add new comments to the list.
+        if (page === 1) {
+          state.comments = comments;
+        } else {
+          state.comments = [...state.comments, ...comments];
+        }
+
+        state.page = page;
+        state.hasNextPage = hasNextPage;
+        state.totalComments = totalComments;
         state.commentsLoading = false;
+    
       })
       .addCase(fetchCommentsByVideo.rejected, (state, action) => {
         state.commentsLoading = false;
