@@ -15,10 +15,17 @@ export default function ConfirmPlaylistDelete({ playlistId, onClose }) {
     if (isDeleting) return;
     setIsDeleting(true);
     try {
-      await dispatch(deletePlaylist({ playlistId })).unwrap();
-      await dispatch(getChannelPlaylists(channelId)).unwrap();
-      onClose();
-      navigate('/playlists');
+     //  Delete the playlist
+    await dispatch(deletePlaylist({ playlistId })).unwrap();
+    
+    //  close the modal and move the user
+    // This stops the PlaylistDetails page from trying to re-render with a null playlist
+    onClose(); 
+    navigate('/playlists', { replace: true });
+
+    //  Refresh the list in the background
+    // Note: Use the object structure { channelId, page: 1 } to match your thunk
+    dispatch(getChannelPlaylists({ channelId, page: 1 }));
     } catch (error) {
       console.error('failed to delete the playlist : ', error);
     } finally {

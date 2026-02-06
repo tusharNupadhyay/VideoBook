@@ -1,5 +1,5 @@
 import { createSlice } from '@reduxjs/toolkit';
-import { logout } from '../auth/authSlice';
+import { logoutUser } from '../auth/authActions';
 import {
   getChannelPlaylists,
   getMyPlaylists,
@@ -15,7 +15,11 @@ import {
 const initialState = {
   playlists: [], // logged-in user's playlists
   channelPlaylists: [], // viewed channel playlists
-  currentPlaylist: null,
+
+  currentPlaylist: {
+    metadata: null,
+    videos: [],
+  },
   loading: {
     fetch: false,
     mutate: false, // create, update, add/remove video, toggle
@@ -24,26 +28,11 @@ const initialState = {
     fetch: null,
     mutate: null,
   },
+  // Standardized Pagination
   pagination: {
-    myPlaylists: {
-      page: 1,
-      limit: 10,
-      total: 0,
-      totalPages: 0,
-    },
-    channelPlaylists: {
-      page: 1,
-      limit: 10,
-      total: 0,
-      totalPages: 0,
-    },
-    currentPlaylist: {
-      //for current playlist videos pagination
-      page: 1,
-      limit: 10,
-      total: 0,
-      totalPages: 0,
-    },
+    myPlaylists: { page: 1, hasNextPage: false, total: 0 },
+    channelPlaylists: { page: 1, hasNextPage: false, total: 0 },
+    currentPlaylist: { page: 1, hasNextPage: false, total: 0 },
   },
 };
 
@@ -52,12 +41,12 @@ const playlistSlice = createSlice({
   initialState,
   reducers: {
     resetCurrentPlaylist: (state) => {
-      state.currentPlaylist = null;
+      state.currentPlaylist = initialState.currentPlaylist;
       state.pagination.currentPlaylist =
         initialState.pagination.currentPlaylist;
     },
     resetchannelPlaylist: (state) => {
-      state.channelPlaylists = initialState.channelPlaylists;
+      state.channelPlaylists = [];
       state.pagination.channelPlaylists =
         initialState.pagination.channelPlaylists;
     },
@@ -65,7 +54,7 @@ const playlistSlice = createSlice({
   extraReducers: (builder) => {
     builder
       //logout
-      .addCase(logout, () => initialState)
+      .addCase(logoutUser.fulfilled, () => initialState)
       //create playlist
       .addCase(createPlaylist.pending, (state) => {
         state.loading.mutate = true;
@@ -74,7 +63,6 @@ const playlistSlice = createSlice({
       .addCase(createPlaylist.fulfilled, (state, action) => {
         state.loading.mutate = false;
         state.playlists.unshift(action.payload);
-        state.currentPlaylist = action.payload;
       })
       .addCase(createPlaylist.rejected, (state, action) => {
         state.loading.mutate = false;
@@ -84,12 +72,21 @@ const playlistSlice = createSlice({
       .addCase(getChannelPlaylists.pending, (state) => {
         state.loading.fetch = true;
         state.error.fetch = null;
-        state.pagination.channelPlaylists.page = 1;
+        // state.pagination.channelPlaylists.page = 1;
       })
       .addCase(getChannelPlaylists.fulfilled, (state, action) => {
         state.loading.fetch = false;
-        state.channelPlaylists = action.payload.playlists;
-        state.pagination.channelPlaylists = action.payload.pagination;
+        const { playlists, totalPlaylists, currentPage, hasNextPage } =
+          action.payload;
+        state.channelPlaylists =
+          currentPage === 1
+            ? playlists
+            : [...state.channelPlaylists, ...playlists];
+        state.pagination.channelPlaylists = {
+          page: currentPage,
+          hasNextPage,
+          total: totalPlaylists,
+        };
       })
       .addCase(getChannelPlaylists.rejected, (state, action) => {
         state.loading.fetch = false;
@@ -100,12 +97,26 @@ const playlistSlice = createSlice({
       .addCase(getMyPlaylists.pending, (state) => {
         state.loading.fetch = true;
         state.error.fetch = null;
-        state.pagination.myPlaylists.page = 1;
+        // state.pagination.myPlaylists.page = 1;
       })
       .addCase(getMyPlaylists.fulfilled, (state, action) => {
         state.loading.fetch = false;
-        state.playlists = action.payload.playlists;
-        state.pagination.myPlaylists = action.payload.pagination;
+        const { playlists, totalPlaylists, currentPage, hasNextPage } =
+          action.payload;
+        // If page is 1, we MUST replace the whole list to ensure
+        // we have the freshest 'hasVideo' statuses from the server.
+        if (currentPage === 1) {
+          state.playlists = playlists;
+        } else {
+          // Only append for subsequent pages
+          state.playlists = [...state.playlists, ...playlists];
+        }
+
+        state.pagination.myPlaylists = {
+          page: currentPage,
+          hasNextPage,
+          total: totalPlaylists,
+        };
       })
       .addCase(getMyPlaylists.rejected, (state, action) => {
         state.loading.fetch = false;
@@ -115,12 +126,27 @@ const playlistSlice = createSlice({
       .addCase(getPlaylistById.pending, (state) => {
         state.loading.fetch = true;
         state.error.fetch = null;
-        state.pagination.currentPlaylist.page = 1;
       })
       .addCase(getPlaylistById.fulfilled, (state, action) => {
         state.loading.fetch = false;
-        state.currentPlaylist = action.payload;
-        state.pagination.currentPlaylist = action.payload.pagination;
+        const { playlist, videos, currentPage, hasNextPage, totalVideos } =
+          action.payload;
+
+        if (currentPage === 1) {
+          state.currentPlaylist.metadata = playlist;
+          state.currentPlaylist.videos = videos;
+        } else {
+          state.currentPlaylist.videos = [
+            ...state.currentPlaylist.videos,
+            ...videos,
+          ];
+        }
+
+        state.pagination.currentPlaylist = {
+          page: currentPage,
+          hasNextPage,
+          total: totalVideos,
+        };
       })
       .addCase(getPlaylistById.rejected, (state, action) => {
         state.loading.fetch = false;
@@ -133,13 +159,42 @@ const playlistSlice = createSlice({
       })
       .addCase(addVideoToPlaylist.fulfilled, (state, action) => {
         state.loading.mutate = false;
-        const { playlistId } = action.meta.arg;
-        const playlist = state.playlists.find((pl) => pl._id === playlistId);
-        if (playlist) playlist.hasVideo = true;
+        const { playlist, totalVideos } = action.payload; // Data from backend
 
-        // keep currentPlaylist in sync
-        if (state.currentPlaylist && state.currentPlaylist._id === playlistId) {
-          state.currentPlaylist.videos.push(action.meta.arg.videoId);
+        // Update the "playlists" array (for Modals/Checkboxes)
+        const pIndex = state.playlists.findIndex((p) => p._id === playlist._id);
+        if (pIndex !== -1) {
+          state.playlists[pIndex] = {
+            ...state.playlists[pIndex],
+            hasVideo: true,
+            totalVideos,
+            coverImage: playlist.coverImage, // Update cover too!
+          };
+        }
+
+        //  Update the "channelPlaylists" array (for the Library/Card page)
+        const cIndex = state.channelPlaylists.findIndex(
+          (p) => p._id === playlist._id
+        );
+        if (cIndex !== -1) {
+          state.channelPlaylists[cIndex] = {
+            ...state.channelPlaylists[cIndex],
+            totalVideos,
+            coverImage: playlist.coverImage,
+          };
+        }
+        //  Update Metadata & Total Count for the Details Page
+        if (state.currentPlaylist.metadata?._id === playlist._id) {
+          // Update cover image (in case we deleted the cover video)
+          state.currentPlaylist.metadata.coverImage = playlist.coverImage;
+
+          // Update the pagination total
+          state.pagination.currentPlaylist.total = totalVideos;
+
+          // // Filter out the video object from the list locally
+          // state.currentPlaylist.videos = state.currentPlaylist.videos.filter(
+          //   (v) => v._id !== videoId
+          // );
         }
       })
       .addCase(addVideoToPlaylist.rejected, (state, action) => {
@@ -154,13 +209,40 @@ const playlistSlice = createSlice({
       })
       .addCase(removeVideoFromPlaylist.fulfilled, (state, action) => {
         state.loading.mutate = false;
-        const { playlistId } = action.meta.arg;
-        const playlist = state.playlists.find((pl) => pl._id === playlistId);
+        const { playlist, totalVideos } = action.payload;
+        const { videoId } = action.meta.arg;
 
-        if (playlist) playlist.hasVideo = false;
-        if (state.currentPlaylist && state.currentPlaylist._id === playlistId) {
+        // Update the "playlists" array (Modal/Checkboxes)
+        const pIndex = state.playlists.findIndex((p) => p._id === playlist._id);
+        if (pIndex !== -1) {
+          state.playlists[pIndex] = {
+            ...state.playlists[pIndex],
+            hasVideo: false,
+            totalVideos,
+            coverImage: playlist.coverImage,
+          };
+        }
+
+        //  Update the "channelPlaylists" array (Library Cards)
+        const cIndex = state.channelPlaylists.findIndex(
+          (p) => p._id === playlist._id
+        );
+        if (cIndex !== -1) {
+          state.channelPlaylists[cIndex] = {
+            ...state.channelPlaylists[cIndex],
+            totalVideos,
+            coverImage: playlist.coverImage,
+          };
+        }
+
+        // Update the Details Page state
+        if (state.currentPlaylist.metadata?._id === playlist._id) {
+          state.currentPlaylist.metadata.coverImage = playlist.coverImage;
+          state.pagination.currentPlaylist.total = totalVideos;
+
+          // Locally filter the videos array so the video disappears immediately
           state.currentPlaylist.videos = state.currentPlaylist.videos.filter(
-            (id) => id !== action.meta.arg.videoId
+            (v) => v._id !== videoId
           );
         }
       })
@@ -176,14 +258,16 @@ const playlistSlice = createSlice({
       })
       .addCase(deletePlaylist.fulfilled, (state, action) => {
         state.loading.mutate = false;
-        state.playlists = state.playlists.filter(
-          (pl) => pl._id !== action.payload
+        const playlistId = action.payload;
+        state.playlists = state.playlists.filter((p) => p._id !== playlistId);
+        state.channelPlaylists = state.channelPlaylists.filter(
+          (p) => p._id !== playlistId
         );
-        if (
-          state.currentPlaylist &&
-          state.currentPlaylist._id === action.payload
-        ) {
-          state.currentPlaylist = null;
+
+        if (state.currentPlaylist?.metadata?._id === playlistId) {
+          state.currentPlaylist = initialState.currentPlaylist;
+          state.pagination.currentPlaylist =
+            initialState.pagination.currentPlaylist;
         }
       })
       .addCase(deletePlaylist.rejected, (state, action) => {
@@ -197,26 +281,19 @@ const playlistSlice = createSlice({
       })
       .addCase(updatePlaylist.fulfilled, (state, action) => {
         state.loading.mutate = false;
-        const updatedPlaylist = action.payload.playlist;
+        const { playlist } = action.payload;
 
-        if (
-          state.currentPlaylist &&
-          state.currentPlaylist._id === updatedPlaylist._id
-        ) {
-          // only update the playlist field, keep videos and pagination
-          state.currentPlaylist = {
-            ...state.currentPlaylist,
-            playlist: { ...updatedPlaylist }, //new object reference so the page rerenders after updating
+        //  Update Metadata if we are currently viewing this playlist
+        if (state.currentPlaylist.metadata?._id === playlist._id) {
+          state.currentPlaylist.metadata = {
+            ...state.currentPlaylist.metadata,
+            ...playlist,
           };
         }
 
-        const index = state.playlists.findIndex(
-          (pl) => pl._id === updatedPlaylist._id
-        );
-
-        if (index !== -1) {
-          state.playlists[index] = { ...updatedPlaylist }; // new reference
-        }
+        //  Update in the general lists
+        const index = state.playlists.findIndex((p) => p._id === playlist._id);
+        if (index !== -1) state.playlists[index] = playlist;
       })
       .addCase(updatePlaylist.rejected, (state, action) => {
         state.loading.mutate = false;
@@ -229,26 +306,23 @@ const playlistSlice = createSlice({
       })
       .addCase(togglePrivacy.fulfilled, (state, action) => {
         state.loading.mutate = false;
-        const updatedPlaylist = action.payload.playlist;
+        const { playlist } = action.payload;
 
-        const index = state.playlists.findIndex(
-          (pl) => pl._id === updatedPlaylist._id
-        );
+        // 1. Sync Metadata
+        if (state.currentPlaylist.metadata?._id === playlist._id) {
+          state.currentPlaylist.metadata.privacy = playlist.privacy;
+        }
 
-        if (index !== -1) {
-          state.playlists[index] = updatedPlaylist;
-        }
-        if (
-          state.currentPlaylist &&
-          state.currentPlaylist._id === updatedPlaylist._id
-        ) {
-          state.currentPlaylist = updatedPlaylist;
-        }
-        if (updatedPlaylist.privacy === 'private') {
-          state.channelPlaylists = state.channelPlaylists.filter(
-            (pl) => pl._id !== updatedPlaylist._id
-          );
-        }
+        // 2. Sync Lists
+        const index = state.playlists.findIndex((p) => p._id === playlist._id);
+        if (index !== -1) state.playlists[index] = playlist;
+
+        // 3. Remove from public channel view if it just became private
+        // if (playlist.privacy === 'private') {
+        //   state.channelPlaylists = state.channelPlaylists.filter(
+        //     (p) => p._id !== playlist._id
+        //   );
+        // }
       })
       .addCase(togglePrivacy.rejected, (state, action) => {
         state.loading.mutate = false;
@@ -258,4 +332,5 @@ const playlistSlice = createSlice({
 });
 
 export default playlistSlice.reducer;
-export const { resetchannelPlaylist, resetCurrentPlaylist } = playlistSlice.actions;
+export const { resetchannelPlaylist, resetCurrentPlaylist } =
+  playlistSlice.actions;

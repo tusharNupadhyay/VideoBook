@@ -11,7 +11,8 @@ import {
   updateUserCoverImage,
   getChannelProfile,
   getWatchHistory,
-  getMyProfile
+  getMyProfile,
+  clearWatchHistory
 } from "../controllers/user.controller.js";
 import { upload } from "../middlewares/multer.middleware.js";
 import { ApiError } from "../utils/ApiError.js";
@@ -48,6 +49,7 @@ router
   .route("/cover-image")
   .patch(verifyJWT, upload.single("coverImage"), updateUserCoverImage)
 router.route("/history").get(verifyJWT, getWatchHistory);
+router.route("/clear-history").patch(verifyJWT,clearWatchHistory)
 
 router.get("/channel/:username",optionalVerifyJwt,getChannelProfile);
 router.get("/me",verifyJWT,getMyProfile);

@@ -11,7 +11,9 @@ import {
   getLikedVideos,
   getWatchHistory,
   deleteVideo,
+  clearWatchHistory,
 } from './videoAction';
+import { logoutUser } from '../auth/authActions';
 import { toggleSubscription } from '../user/userActions';
 
 const initialState = {
@@ -21,7 +23,7 @@ const initialState = {
 
   // HOME PAGE VIDEOS
   homeVideos: [],
-  homePage: 1, 
+  homePage: 1,
   hasNextHomePage: false,
   homeLoading: false,
   homeError: null,
@@ -56,6 +58,9 @@ const initialState = {
   // USER WATCH HISTORY
   watchHistory: {
     videos: [],
+    page: 1,
+    hasNextPage: false,
+    total: 0,
     loading: false,
     error: null,
   },
@@ -63,23 +68,34 @@ const initialState = {
   // USER LIKED VIDEOS
   likedVideos: {
     videos: [],
+    page: 1,
+    hasNextPage: false,
     total: 0,
     loading: false,
     error: null,
   },
 
   // VIDEOS ON A USER CHANNEL (PUBLIC)
-  channelVideos: [],
-  channelPage: 1,
-  hasNextChannelPage: false,
-  channelLoading: false,
-  channelError: null,
+  channelVideos: {
+    videos: [],
+    page: 1,
+    hasNextPage: false,
+    total: 0,
+    loading: false,
+    error: null,
+  },
+  // channelVideos: [],
+  // channelPage: 1,
+  // hasNextChannelPage: false,
+  // channelLoading: false,
+  // channelError: null,
 
   // MANAGE YOUR VIDEOS (PRIVATE)
   myVideos: {
-    // always store initial state in what data type api is returning
     videos: [],
     total: 0,
+    page: 1,
+    hasNextPage: false,
     owner: {},
   },
   myVideosLoading: false,
@@ -122,11 +138,7 @@ const videoSlice = createSlice({
       state.uploadError = null;
     },
     resetChannelVideos: (state) => {
-      state.channelVideos = [];
-      state.channelError = null;
-      state.channelLoading = false;
-      state.channelPage=1;
-      state.hasNextChannelPage =false;
+      state.channelVideos = initialState.channelVideos;
     },
     resetUploadState: (state) => {
       state.uploadLoading = false;
@@ -153,6 +165,8 @@ const videoSlice = createSlice({
   //always reset errors on pending
   extraReducers: (builder) => {
     builder
+      //reset when logout
+      .addCase(logoutUser.fulfilled, () => initialState)
       //Upload video
       .addCase(uploadVideo.pending, (state) => {
         state.uploadLoading = true;
@@ -176,6 +190,33 @@ const videoSlice = createSlice({
         state.fetchLoading = false;
         state.fetchError = null;
         state.singleVideo = action.payload;
+        const watchedVideo = action.payload;
+        if (!watchedVideo) return;
+
+        // --- SYNC WATCH HISTORY ---
+        // 1. Check if the video already exists in the local history array
+        const alreadyExists = state.watchHistory.videos.find(
+          (v) => v._id === watchedVideo._id
+        );
+
+        // 2. Filter out the video if it exists so we can move it to the top
+        const filteredHistory = state.watchHistory.videos.filter(
+          (v) => v._id !== watchedVideo._id
+        );
+
+        // 3. Update the array (Put the newest at index 0)
+        state.watchHistory.videos = [watchedVideo, ...filteredHistory];
+
+        // 4. FIX THE TOTAL COUNT LOGIC
+        // Only increment if the video was NOT already in our local list
+        if (!alreadyExists) {
+          // Safety check: if total is somehow corrupted or 0 after a clear,
+          // ensure we don't jump ahead.
+          state.watchHistory.total =
+            state.watchHistory.videos.length > state.watchHistory.total
+              ? state.watchHistory.videos.length
+              : state.watchHistory.total + 1;
+        }
       })
       .addCase(fetchVideoById.rejected, (state, action) => {
         state.fetchLoading = false;
@@ -225,6 +266,37 @@ const videoSlice = createSlice({
       .addCase(toggleVideoReaction.fulfilled, (state, action) => {
         state.actionLoading = false;
         state.reactions = action.payload; // updated counts
+        const videoId = action.meta.arg.videoId; // Passed from thunk
+        const { userReaction } = action.payload; //1,-1 or null
+        //  Sync with Liked Videos list
+        if (userReaction === 1) {
+          // VIDEO WAS JUST LIKED
+          if (state.singleVideo && state.singleVideo._id === videoId) {
+            // Check if it's already there to avoid duplicates
+            const isAlreadyInList = state.likedVideos.videos.some(
+              (v) => v._id === videoId
+            );
+
+            if (!isAlreadyInList) {
+              // Add to the top of the list
+              state.likedVideos.videos.unshift(state.singleVideo);
+              state.likedVideos.total += 1;
+            }
+          }
+        } else {
+          // VIDEO WAS UNLIKED OR DISLIKED
+          // If it was in the liked list, remove it
+          const wasInList = state.likedVideos.videos.some(
+            (v) => v._id === videoId
+          );
+
+          if (wasInList) {
+            state.likedVideos.videos = state.likedVideos.videos.filter(
+              (v) => v._id !== videoId
+            );
+            state.likedVideos.total -= 1;
+          }
+        }
       })
       .addCase(toggleVideoReaction.rejected, (state, action) => {
         state.actionLoading = false;
@@ -232,24 +304,29 @@ const videoSlice = createSlice({
       })
       //get channel videos by username (public)
       .addCase(getChannelVideos.pending, (state) => {
-        state.channelLoading = true;
-        state.channelError = null;
+        state.channelVideos.loading = true;
+        state.channelVideos.error = null;
       })
       .addCase(getChannelVideos.fulfilled, (state, action) => {
-        state.channelLoading = false;
-        const { videos, hasNextPage, currentPage } = action.payload;
-
+        state.channelVideos.loading = false;
+        const { videos, hasNextPage, currentPage, totalVideos } =
+          action.payload;
         if (currentPage === 1) {
-          state.channelVideos = videos;
+          state.channelVideos.videos = videos;
         } else {
-          state.channelVideos = [...state.channelVideos, ...videos];
+          state.channelVideos.videos = [
+            ...state.channelVideos.videos,
+            ...videos,
+          ];
         }
-        state.hasNextChannelPage = hasNextPage;
-        state.channelPage = currentPage;
+
+        state.channelVideos.hasNextPage = hasNextPage;
+        state.channelVideos.page = currentPage;
+        state.channelVideos.total = totalVideos;
       })
       .addCase(getChannelVideos.rejected, (state, action) => {
-        state.channelLoading = false;
-        state.channelError = action.payload;
+        state.channelVideos.loading = false;
+        state.channelVideos.error = action.payload;
       })
       //get my videos (PRIVATE)
       .addCase(getMyVideos.pending, (state) => {
@@ -258,7 +335,18 @@ const videoSlice = createSlice({
       })
       .addCase(getMyVideos.fulfilled, (state, action) => {
         state.myVideosLoading = false;
-        state.myVideos = action.payload;
+
+        const { videos, owner, pagination } = action.payload;
+        if (pagination.page === 1) {
+          state.myVideos.videos = videos;
+        } else {
+          // Append for infinite scroll or "Load More"
+          state.myVideos.videos = [...state.myVideos.videos, ...videos];
+        }
+        state.myVideos.owner = owner;
+        state.myVideos.total = pagination.total;
+        state.myVideos.page = pagination.page;
+        state.myVideos.hasNextPage = pagination.hasNextPage;
         state.myVideosError = null;
       })
       .addCase(getMyVideos.rejected, (state, action) => {
@@ -292,11 +380,37 @@ const videoSlice = createSlice({
       })
       .addCase(getWatchHistory.fulfilled, (state, action) => {
         state.watchHistory.loading = false;
-        state.watchHistory.videos = action.payload.history;
+        const { history, pagination } = action.payload;
+        if (pagination.page === 1) {
+          state.watchHistory.videos = history;
+        } else {
+          state.watchHistory.videos = [
+            ...state.watchHistory.videos,
+            ...history,
+          ];
+        }
+        state.watchHistory.page = pagination.page;
+        state.watchHistory.hasNextPage = pagination.hasNextPage;
+        state.watchHistory.total = pagination.total;
       })
       .addCase(getWatchHistory.rejected, (state, action) => {
         state.watchHistory.error = action.payload;
         state.watchHistory.loading = false;
+      })
+      //clear watch history
+      .addCase(clearWatchHistory.pending, (state) => {
+        state.watchHistory.loading = true;
+        state.watchHistory.error = null;
+      })
+      .addCase(clearWatchHistory.fulfilled, (state) => {
+        state.watchHistory.videos = [];
+        state.watchHistory.total = 0;
+        state.watchHistory.hasNextPage = false;
+        state.watchHistory.page = 1;
+      })
+      .addCase(clearWatchHistory.rejected, (state, action) => {
+        state.watchHistory.loading = false;
+        state.watchHistory.error = action.payload;
       })
       //Liked Videos
       .addCase(getLikedVideos.pending, (state) => {
@@ -305,7 +419,18 @@ const videoSlice = createSlice({
       })
       .addCase(getLikedVideos.fulfilled, (state, action) => {
         state.likedVideos.loading = false;
-        state.likedVideos.videos = action.payload;
+        const { videos, pagination } = action.payload;
+
+        if (pagination.page === 1) {
+          state.likedVideos.videos = videos;
+        } else {
+          // Append logic for Infinite Scroll
+          state.likedVideos.videos = [...state.likedVideos.videos, ...videos];
+        }
+
+        state.likedVideos.page = pagination.page;
+        state.likedVideos.hasNextPage = pagination.hasNextPage;
+        state.likedVideos.total = pagination.total;
       })
       .addCase(getLikedVideos.rejected, (state, action) => {
         state.likedVideos.error = action.payload;
@@ -321,6 +446,7 @@ const videoSlice = createSlice({
         state.myVideos.videos = state.myVideos.videos.filter(
           (video) => video._id !== action.payload
         );
+        state.myVideos.total -= 1;
       })
       .addCase(deleteVideo.rejected, (state, action) => {
         state.deleteVideoLoading = false;

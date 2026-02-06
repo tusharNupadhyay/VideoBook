@@ -1,6 +1,7 @@
 import { ApiError } from "../utils/ApiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { User } from "../models/user.model.js";
+import { Video } from "../models/video.model.js";
 import {
   uploadOnCloudinary,
   deleteFromCloudinary,
@@ -132,7 +133,7 @@ const loginUser = asyncHandler(async (req, res) => {
     secure: isProduction, //cookies sent only over https not http
     //secure: true may prevent cookies from being set, so use secure: process.env.NODE_ENV = "production"
     sameSite: isProduction ? "none" : "lax",
-    path:'/',
+    path: "/",
   };
   return res
     .status(200)
@@ -186,7 +187,8 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
       httpOnly: true,
       secure: isProduction,
       sameSite: isProduction ? "none" : "lax",
-      path: '/',    };
+      path: "/",
+    };
     const { accessToken, refreshToken: newRefreshToken } =
       await generateAccessRefreshTokens(user._id);
 
@@ -223,16 +225,16 @@ const getCurrentUser = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, req.user, "current user fetched successfully"));
 });
 const updateAccountDetails = asyncHandler(async (req, res) => {
-  const { fullName, email,username } = req.body;
+  const { fullName, email, username } = req.body;
 
   const updatedObject = {};
-  if(fullName?.trim()) updatedObject.fullName = fullName.trim();
-  if(email?.trim()) updatedObject.email = email.trim();
-  if(username?.trim()) updatedObject.username = username.trim();
+  if (fullName?.trim()) updatedObject.fullName = fullName.trim();
+  if (email?.trim()) updatedObject.email = email.trim();
+  if (username?.trim()) updatedObject.username = username.trim();
 
   //if nothing to update
-    if (Object.keys(updatedObject).length === 0)
-      throw new ApiError(400, "No valid fields provided for update");
+  if (Object.keys(updatedObject).length === 0)
+    throw new ApiError(400, "No valid fields provided for update");
 
   //new: true returns updated information
   const user = await User.findByIdAndUpdate(
@@ -303,90 +305,125 @@ const getWatchHistory = asyncHandler(async (req, res) => {
   const limit = Number(req.query.limit) || 10;
   const skip = (page - 1) * limit;
 
-  const user = await User.aggregate([
+  const result = await User.aggregate([
     {
       $match: {
         _id: userId,
       },
     },
     {
-      $project: { watchHistory: 1 },
+      $project: {
+        totalHistory: { $size: { $ifNull: ["$watchHistory", []] } },
+        // Slice the ID array first for performance before looking up video details
+        paginatedIds: {
+          $slice: [{ $reverseArray: "$watchHistory" }, skip, limit],
+        },
+      },
     },
     {
       $lookup: {
         from: "videos",
-        let: { history: "$watchHistory" },
+        localField: "paginatedIds",
+        foreignField: "_id",
+        as: "videos",
         pipeline: [
-          {
-            $match: {
-              $expr: { $in: ["$_id", "$$history"] }, //select only video's whose id's exist in watchHistory
-            },
-          },
-          {
-            //Figures out where each video appears in the user’s watchHistory array and stores that position as watchIndex so the results can be sorted correctly.
-            $addFields: {
-              //indexOfArray returns the position index of video _id inside history array and -1 if not found
-              watchIndex: { $indexOfArray: ["$$history", "$_id"] },
-            },
-          },
-          {
-            $sort: { watchIndex: -1 }, //most recently watched first
-          },
-          //pagination
-          { $skip: skip },
-          { $limit: limit },
-          //lookup owner
           {
             $lookup: {
               from: "users",
               localField: "owner",
               foreignField: "_id",
               as: "owner",
+              pipeline: [{ $project: { username: 1, avatar: 1 } }],
             },
           },
-          {
-            $unwind: "$owner",
-          },
-          //select only required field
+          { $unwind: "$owner" },
           {
             $project: {
               thumbnail: 1,
               duration: 1,
               title: 1,
-              "owner.username": 1,
-              "owner.avatar": 1,
+              owner: 1,
               createdAt: 1,
               viewCount: { $size: { $ifNull: ["$views", []] } },
             },
           },
         ],
-        as: "watchHistory",
       },
     },
     {
       $addFields: {
-        totalHistory: { $size: "$watchHistory" },
-      },
-    },
-    {
-      $project: {
-        _id: 0,
-        watchHistory: 1,
-        totalHistory: 1,
+        // Since lookup doesn't guarantee order, we re-sort based on original paginatedIds
+        videos: {
+          $map: {
+            input: "$paginatedIds",
+            as: "id",
+            in: {
+              $arrayElemAt: [
+                {
+                  $filter: {
+                    input: "$videos",
+                    as: "v",
+                    cond: { $eq: ["$$v._id", "$$id"] },
+                  },
+                },
+                0,
+              ],
+            },
+          },
+        },
       },
     },
   ]);
+
+  const history = result[0]?.videos || [];
+  const total = result[0]?.totalHistory || 0;
   return res.status(200).json(
     new ApiResponse(
       200,
       {
-        history: user?.[0]?.watchHistory,
+        history,
+        pagination: {
+          total,
+          page,
+          hasNextPage: page * limit < total,
+        },
       },
       "watch history fetched successfully"
     )
   );
 });
+const clearWatchHistory = asyncHandler(async (req, res) => {
+  const userId = req.user?._id;
 
+  // 1. Clear the UI Source: Reset the User's watchHistory array
+  const userUpdate = await User.findByIdAndUpdate(
+    userId,
+    {
+      $set: {
+        watchHistory: [], //clear the array
+      },
+    },
+    { new: true }
+  );
+
+  // views:  Pull the User from all Video views
+  // This ensures view counts are also corrected
+  await Video.updateMany(
+    { views: userId },
+    {
+      $pull: {
+        views: userId,
+      },
+    }
+  );
+
+  // console.log(
+  //   `Matched: ${updateResult.matchedCount}, Modified: ${updateResult.modifiedCount}`
+  // );
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Watch history cleared successfully"));
+});
 //helper base pipeline arrow function that implicit returns an array (without return)
 const buildChannelProfilePipeline = (userId) => [
   {
@@ -590,5 +627,6 @@ export {
   updateUserCoverImage,
   getChannelProfile,
   getWatchHistory,
+  clearWatchHistory,
   getMyProfile,
 };

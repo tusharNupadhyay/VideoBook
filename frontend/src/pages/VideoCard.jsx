@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import formatDuration from '../utility/formatDuration.js';
 import timeAgo from '../utility/timeAgo.js';
 import { useAppSelector } from '../app/hooks.js';
+import { IoMdClose } from "react-icons/io";
 
 // function VideoCard({ video }) {
 //   const navigate = useNavigate();
@@ -76,7 +77,7 @@ import { useAppSelector } from '../app/hooks.js';
 //   );
 // }
 
-function VideoCard({ video }) {
+function VideoCard({ video ,onRemove}) {
   const { userInfo } = useAppSelector((state) => state.auth);
 
   const isMe = video.owner?._id === userInfo?._id;
@@ -99,6 +100,22 @@ function VideoCard({ video }) {
         <div className="absolute bottom-2 right-2 bg-black/80 px-1.5 py-0.5 rounded text-[11px] font-bold text-white">
           {formatDuration(video.duration)}
         </div>
+        {/* RENDER ONLY IF onRemove IS PROVIDED */}
+      {onRemove && (
+        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            onClick={(e) => {
+              e.preventDefault(); //stop link from navigation
+              e.stopPropagation(); //stop event from bubbling
+              onRemove(video._id);
+            }}
+            className="p-2 bg-black/80 hover:bg-red-600 text-white rounded-full shadow-lg"
+            title="Remove from playlist"
+          >
+            <IoMdClose size={18} />
+          </button>
+        </div>
+      )}
       </Link>
 
       {/* 2. Details Section */}
@@ -128,7 +145,7 @@ function VideoCard({ video }) {
               className="hover:text-white transition-colors w-fit font-medium"
             >
               {video.owner?.username}
-            </Link>
+            </Link> 
             <div className="flex items-center gap-1 mt-0.5">
               <span>{video.viewCount} views</span>
               <span>•</span>

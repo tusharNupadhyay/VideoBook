@@ -409,7 +409,7 @@ const getMyVideos = asyncHandler(async (req, res) => {
   const limit = Number(req.query.limit) || 10;
   const skip = (page - 1) * limit;
 
-  const videos = await Video.aggregate([
+  const result = await Video.aggregate([
     {
       $match: { owner: userId },
     },
@@ -459,14 +459,20 @@ const getMyVideos = asyncHandler(async (req, res) => {
       },
     },
   ]);
+  const data = result[0];
+  const total = data.total[0]?.count || 0
   
-  const result = videos[0];
-
+  
 return res.status(200).json(
   new ApiResponse(200, {
-    owner: result.owner[0] || null,
-    videos: result.videos,
-    total: result.total[0]?.count || 0
+    owner: data.owner[0] || null,
+      videos: data.videos,
+      pagination: {
+        total,
+        page,
+        limit,
+        hasNextPage: page * limit < total 
+      }
   }, "My videos fetched")
 );
 });

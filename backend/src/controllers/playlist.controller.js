@@ -33,55 +33,47 @@ const createPlaylist = asyncHandler(async (req, res) => {
 
 const getChannelPlaylists = asyncHandler(async (req, res) => {
   //fetch only playlists of channel not the videos
+
+  const { channelId } = req.params;
+  const { page = 1, limit = 10,  } = req.query;
+
   const userId = req.user?._id;
+  const targetChannelId = validateId(channelId);
+
   const videoId = req.query.videoId ? validateId(req.query.videoId) : null; //to compute hasVideo field in playlists
 
-  const channelId = validateId(req.params.channelId); // same as userId (compulsory)
+  // Check if the requester is the owner of the channel
+  const isOwner = userId?.toString() === targetChannelId.toString();
 
-  const isOwner = userId && userId.toString() === channelId.toString();
+  const pageNumber = parseInt(page);
+  const limitNumber = parseInt(limit);
 
-  const page = Number(req.query.page) || 1;
-  const limit = Number(req.query.limit) || 10;
-  const skip = (page - 1) * limit;
 
-  const result = await PlayList.aggregate([
+ const result = await PlayList.aggregate([
     {
       $match: {
-        owner: channelId,
-        //returns both public and private playlists if isOwner is true
+        owner: targetChannelId,
+        // Only show private playlists to the owner
         ...(isOwner ? {} : { privacy: "public" }),
       },
     },
+    { $sort: { createdAt: -1 } },
+
     {
       $facet: {
-        data: [
-          { $sort: { createdAt: -1 } },
-          { $skip: skip },
-          { $limit: limit },
+        //  The Playlist Data
+        playlists: [
+          { $skip: (pageNumber - 1) * limitNumber },
+          { $limit: limitNumber },
           {
             $addFields: {
-              hasVideo: videoId ? { $in: [videoId, "$videos"] } : false,
-            },
+              // Check if a specific video is in this playlist (for UI checkboxes)
+              hasVideo: videoId 
+                ? { $in: [videoId, "$videos"] } 
+                : false,
+              totalVideos: { $size: "$videos" }
+            }
           },
-          {
-            //playlist owner lookup
-            $lookup: {
-              from: "users",
-              localField: "owner",
-              foreignField: "_id",
-              as: "owner",
-              pipeline: [
-                {
-                  $project: {
-                    username: 1,
-                    avatar: 1,
-                  },
-                },
-              ],
-            },
-          },
-          { $unwind: "$owner" },
-
           {
             $project: {
               name: 1,
@@ -89,111 +81,91 @@ const getChannelPlaylists = asyncHandler(async (req, res) => {
               privacy: 1,
               coverImage: 1,
               hasVideo: 1,
-              videos: 1,
-              owner: {
-                _id: "$owner._id",
-                username: "$owner.username",
-                avatar: "$owner.avatar",
-              },
-            },
-          },
+              totalVideos: 1,
+              createdAt: 1
+            }
+          }
         ],
-        totalCount: [{ $count: "count" }],
-      },
-    },
+        // total number of playlists
+        totalCount: [{ $count: "count" }]
+      }
+    }
   ]);
-  const playlists = result[0].data;
-  const total = result[0].totalCount[0]?.count || 0;
 
-  return res.status(200).json(
+  const playlists = result[0]?.playlists || [];
+  const total = result[0]?.totalCount[0]?.count || 0;
+
+
+return res.status(200).json(
     new ApiResponse(
       200,
       {
         playlists,
-        pagination: {
-          total,
-          page,
-          limit,
-          totalPages: Math.ceil(total / limit),
-        },
+        totalPlaylists: total,
+        currentPage: pageNumber,
+        hasNextPage: pageNumber * limitNumber < total,
+        totalPages: Math.ceil(total / limitNumber)
       },
-      "fetched user's playlists successfully"
+      "channel playlists fetched successfully"
     )
   );
 });
 const getPlaylistById = asyncHandler(async (req, res) => {
-  const playlistId = validateId(req.params.playlistId);
+  const { playlistId } = req.params;
+  const { page = 1, limit = 10 } = req.query;
 
-  const page = Number(req.query.page) || 1;
-  const limit = Number(req.query.limit) || 10;
-  const skip = (page - 1) * limit;
+  const targetPlaylistId = validateId(playlistId);
+  const pageNumber = parseInt(page);
+  const limitNumber = parseInt(limit);
 
-  //to find out owner of playlist so we can check whether req.user._id = owner to fetch private playlist
-  const playlist = await PlayList.findById(playlistId).select("owner privacy");
-  if (!playlist) throw new ApiError(404, "Playlist do not exist");
-  const isOwner =
-    req.user && playlist.owner.toString() === req.user._id.toString();
-  //no need to check in match stage using $or
-  if (playlist.privacy === "private" && !isOwner)
-    throw new ApiError(403, "Playlist is private");
-
-  //using aggregation pipeline
   const result = await PlayList.aggregate([
-    {
-      $match: {
-        _id: playlistId,
-      },
-    },
+    { $match: { _id: targetPlaylistId } },
     {
       $facet: {
-        playlist: [
-          //playlist owner lookup
+        // Part A: Playlist Information (Header)
+        metadata: [
           {
             $lookup: {
               from: "users",
               localField: "owner",
               foreignField: "_id",
               as: "owner",
-            },
+              pipeline: [{ $project: { username: 1, avatar: 1 } }]
+            }
           },
-          {
-            $unwind: "$owner",
-          },
+          { $unwind: "$owner" },
           {
             $project: {
               name: 1,
               description: 1,
               coverImage: 1,
               privacy: 1,
-              owner: {
-                _id: "$owner._id",
-                username: "$owner.username",
-                avatar: "$owner.avatar",
-              },
-            },
-          },
+              owner: 1,
+              totalVideos: { $size: "$videos" }
+            }
+          }
         ],
+        // Part B: Paginated Videos List
         videos: [
-          //without unwind pagination and sorting wouldn't be possible
           { $unwind: "$videos" },
-          { $sort: { createdAt: -1 } },
-          { $skip: skip },
-          { $limit: limit },
+          // sort the IDs or creation dates here if needed
+          { $skip: (pageNumber - 1) * limitNumber },
+          { $limit: limitNumber },
           {
             $lookup: {
               from: "videos",
               localField: "videos",
               foreignField: "_id",
-              as: "video",
+              as: "videoDetails",
               pipeline: [
-                //lookup the owner of the video
                 {
                   $lookup: {
                     from: "users",
                     localField: "owner",
                     foreignField: "_id",
                     as: "owner",
-                  },
+                    pipeline: [{ $project: { username: 1, avatar: 1 } }]
+                  }
                 },
                 { $unwind: "$owner" },
                 {
@@ -202,55 +174,47 @@ const getPlaylistById = asyncHandler(async (req, res) => {
                     thumbnail: 1,
                     duration: 1,
                     createdAt: 1,
-                    views: 1,
-                    owner: {
-                      _id: "$owner._id",
-                      username: "$owner.username",
-                      avatar: "$owner.avatar",
-                    },
-                  },
-                },
-              ],
-            },
+                    viewCount: { $size: { $ifNull: ["$views", []] } },
+                    owner: 1
+                  }
+                }
+              ]
+            }
           },
-          { $unwind: "$video" },
-
-          {
-            $project: {
-              _id: "$video._id",
-              title: "$video.title",
-              thumbnail: "$video.thumbnail",
-              duration: "$video.duration",
-              createdAt: "$video.createdAt",
-              viewCount: {
-                $size: { $ifNull: ["$video.views", []] },
-              },
-              owner: "$video.owner",
-            },
-          },
-        ],
-
-        totalVideos: [{ $project: { count: { $size: "$videos" } } }],
-      },
-    },
+          { $unwind: "$videoDetails" },
+          { $replaceRoot: { newRoot: "$videoDetails" } }
+        ]
+      }
+    }
   ]);
+
+  const playlistInfo = result[0]?.metadata[0];
+  if (!playlistInfo) throw new ApiError(404, "Playlist not found");
+
+  // Security Check: If private, ensure req.user is the owner
+  if (playlistInfo.privacy === "private" && 
+      playlistInfo.owner._id.toString() !== req.user?._id.toString()) {
+    throw new ApiError(403, "This playlist is private");
+  }
+
+  const videos = result[0]?.videos || [];
+  const total = playlistInfo.totalVideos;
 
   return res.status(200).json(
     new ApiResponse(
       200,
       {
-        playlist: result[0].playlist[0],//single object
-        videos: result[0].videos, // array
-        pagination: {
-          total: result[0].totalVideos[0]?.count || 0,
-          page,
-          limit,
-          totalPages: Math.ceil((result[0].totalVideos[0]?.count || 0) / limit),
-        },
+        playlist: playlistInfo,
+        videos,
+        totalVideos: total,
+        currentPage: pageNumber,
+        hasNextPage: pageNumber * limitNumber < total,
+        totalPages: Math.ceil(total / limitNumber)
       },
-      "Fetched playlist successfully"
+      "Playlist details fetched successfully"
     )
   );
+
 });
 const addVideoToPlaylist = asyncHandler(async (req, res) => {
   const playlistId = validateId(req.params.playlistId);
@@ -280,8 +244,7 @@ const addVideoToPlaylist = asyncHandler(async (req, res) => {
       200,
       {
         playlist: updatedPlaylist,
-        // videoCount: updatedPlaylist.videos.length,
-        // coverImage: video.thumbnail,
+        totalVideos: updatedPlaylist.videos.length,
       },
       "Video added to playlist"
     )
@@ -295,32 +258,23 @@ const removeVideoFromPlaylist = asyncHandler(async (req, res) => {
   if (!playlist) throw new ApiError(404, "Playlist not found");
 
   if (playlist.owner.toString() !== req.user._id.toString()) {
-    throw new ApiError(403, "You are not allowed to modify this playlist");
+    throw new ApiError(403, "Unauthorized");
   }
-  const video = await Video.findById(videoId);
-  if (!video) throw new ApiError(404, "Video not found");
 
-  //remove videoID from playlist
-  let updatedPlaylist = await PlayList.findByIdAndUpdate(
+  const video = await Video.findById(videoId);
+  
+  //  Pull the video
+  const updatedPlaylist = await PlayList.findByIdAndUpdate(
     playlistId,
-    {
-      $pull: { videos: videoId },
-    },
+    { $pull: { videos: videoId } },
     { new: true }
   ).populate("owner", "username avatar");
 
-  if (!updatedPlaylist) throw new ApiError(404, "Playlist not found");
-
-  //now check if cover image needs to be updated or not
-
-  if (updatedPlaylist.coverImage === video.thumbnail) {
-    //findOne returns arbitrary any document so we sort to only fetch latest video
-    const latestVideo = await Video.findOne({
-      _id: { $in: updatedPlaylist.videos },
-    })
-      .sort({ createdAt: -1 })
-      .select("thumbnail");
-
+  //  update cover image if we just deleted the cover video
+  if (updatedPlaylist.coverImage === video?.thumbnail) {
+    const latestVideo = await Video.findOne({ _id: { $in: updatedPlaylist.videos } })
+      .sort({ createdAt: -1 });
+    
     updatedPlaylist.coverImage = latestVideo ? latestVideo.thumbnail : null;
     await updatedPlaylist.save();
   }
@@ -330,9 +284,9 @@ const removeVideoFromPlaylist = asyncHandler(async (req, res) => {
       200,
       {
         playlist: updatedPlaylist,
-        videoCount: updatedPlaylist.videos.length,
+        totalVideos: updatedPlaylist.videos.length, 
       },
-      "Video removed from playlist"
+      "Video removed successfully"
     )
   );
 });
@@ -371,13 +325,13 @@ const updatePlaylist = asyncHandler(async (req, res) => {
       },
     },
     { new: true }
-  );
+  ).populate("owner", "username avatar");
   return res.status(200).json(
     new ApiResponse(
       200,
       {
         playlist: updatedPlaylist,
-        // videoCount: updatedPlaylist.videos.length,
+        totalVideos: updatedPlaylist.videos.length,
       },
       "Playlist updated successfully"
     )
@@ -411,7 +365,7 @@ const togglePrivacy = asyncHandler(async (req, res) => {
       200,
       {
         playlist: updatedPlaylist,
-        videoCount: updatedPlaylist.videos.length,
+        totalVideos: updatedPlaylist.videos.length,
       },
       "Playlist updated successfully"
     )

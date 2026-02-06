@@ -6,7 +6,8 @@ import { FaPlay } from "react-icons/fa";
 
 function PlaylistCard({ playlist }) {
   const navigate = useNavigate();
-  const videoCount = playlist.videos?.length || 0;
+  console.log({playlist});
+  const videoCount = playlist.totalVideos || 0;
 
   return (
     <div

@@ -9,13 +9,16 @@ import {
 
 export default function AddToPlaylistModal({ onClose, onCreateNew, videoId }) {
   const popupRef = useRef(null);
+  const sentinelRef = useRef(null); // for scrollabe div pagination
+
   // store currently updating playlistId to prevent multiple clicks
   const [pendingId, setPendingId] = useState(null);
 
-  const { playlists, loading } = useAppSelector((state) => state.playlist);
+  const { playlists, loading,pagination } = useAppSelector((state) => state.playlist);
   const dispatch = useAppDispatch();
   const { userInfo } = useAppSelector((state) => state.auth);
   const channelId = userInfo?._id;
+  const { hasNextPage, page } = pagination.myPlaylists;
   
 
   //close on outside click
@@ -29,10 +32,29 @@ export default function AddToPlaylistModal({ onClose, onCreateNew, videoId }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [onClose]);
 
-  // Fetch playlists every time modal opens
+  // 1. Initial Fetch (Page 1)
   useEffect(() => {
-    if (channelId) dispatch(getMyPlaylists({ channelId, videoId }));
+    if (channelId) {
+      dispatch(getMyPlaylists({ channelId, videoId, page: 1, limit: 10 }));
+    }
   }, [dispatch, channelId, videoId]);
+
+  // 2. Infinite Scroll Observer
+  useEffect(() => {
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && hasNextPage && !loading.fetch) {
+        dispatch(getMyPlaylists({ 
+          channelId, 
+          videoId, 
+          page: page + 1, 
+          limit: 10 
+        }));
+      }
+    });
+
+    if (sentinelRef.current) observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, [hasNextPage, page, loading.fetch, channelId, videoId, dispatch]);
 
   // Toggle playlist selection
     const handleToggle = async (playlistId, hasVideo) => {
@@ -56,40 +78,48 @@ export default function AddToPlaylistModal({ onClose, onCreateNew, videoId }) {
   };
 
   return (
-    <div
+   <div
       ref={popupRef}
-      className=" absolute bottom-full  mb-2 w-72 flex flex-col gap-2 p-2 rounded bg-neutral-900 shadow-xl"
+      className="absolute bottom-full mb-2 w-72 flex flex-col gap-2 p-3 rounded-lg bg-neutral-900 shadow-2xl border border-white/10 z-50"
     >
-      <h2>Add to playlist</h2>
-      {loading.fetch && (
-        <p className="text-sm text-neutral-400">Loading playlists...</p>
-      )}
+      <h2 className="text-sm font-semibold text-neutral-300 mb-2">Save to...</h2>
 
-      {!loading.fetch && playlists.length === 0 && (
-        <p className="text-sm text-neutral-400">You don't have playlists yet</p>
-      )}
-
-      {!loading.fetch &&
-        playlists.map((pl) => (
-          <label
-            key={pl._id}
-            className="flex items-center gap-2 cursor-pointer"
-          >
+      {/* SCROLLABLE CONTAINER */}
+      <div className="max-h-56 overflow-y-auto custom-scrollbar flex flex-col gap-2 pr-1">
+        {playlists.map((pl) => (
+          <label key={pl._id} className="flex items-center gap-3 cursor-pointer group py-1">
             <input
               disabled={pendingId === pl._id}
               type="checkbox"
               checked={!!pl.hasVideo}
-              onChange={() => handleToggle(pl._id,pl.hasVideo)}
+              onChange={() => handleToggle(pl._id, pl.hasVideo)}
+              className="w-4 h-4 accent-blue-500 cursor-pointer"
             />
-            <span>{pl.name}</span>
+            <span className="text-sm text-neutral-200 group-hover:text-white transition-colors truncate">
+              {pl.name}
+            </span>
           </label>
         ))}
 
+        {/* LOADING SENTINEL */}
+        <div ref={sentinelRef} className="h-4 w-full flex justify-center py-2">
+          {loading.fetch && (
+            <div className="w-4 h-4 border-2 border-t-blue-500 border-white/20 rounded-full animate-spin" />
+          )}
+        </div>
+        
+        {!loading.fetch && playlists.length === 0 && (
+          <p className="text-xs text-neutral-500 italic">No playlists found.</p>
+        )}
+      </div>
+
+      <hr className="border-white/10 my-1" />
+
       <button
         onClick={onCreateNew}
-        className="flex items-center justify-center gap-1 bg-neutral-800 rounded w-full cursor-pointer"
+        className="flex items-center justify-center gap-2 py-2 hover:bg-white/5 rounded-md transition text-sm text-blue-400 font-medium cursor-pointer"
       >
-        <IoMdAdd /> <span>Create</span>
+        <IoMdAdd size={18} /> <span>Create new playlist</span>
       </button>
     </div>
   );

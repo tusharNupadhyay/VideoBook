@@ -3,9 +3,9 @@ import api from "../../lib/axios";
 
 export const getChannelPlaylists = createAsyncThunk(
   'playlists/getChannelPlaylists',
-  async (channelId, { rejectWithValue }) => {
+  async ({ channelId, page = 1, limit = 10 }, { rejectWithValue }) => {
     try {
-      const res = await api.get(`/playlists/channel/${channelId}`);
+      const res = await api.get(`/playlists/channel/${channelId}?page=${page}&limit=${limit}`);
       return res.data.data;
     } catch (error) {
       return rejectWithValue(
@@ -17,12 +17,15 @@ export const getChannelPlaylists = createAsyncThunk(
 
 export const getMyPlaylists = createAsyncThunk(
   'playlists/getMyPlaylists',
-  async ({channelId,videoId}, { rejectWithValue }) => {
+  async ({channelId,videoId,page=1,limit=10}, { rejectWithValue }) => {
     try {
       const res = await api.get(`/playlists/channel/${channelId}`,{
-        params: videoId ? {videoId} : {}, //add videoId query parameter if videoId is passed
+        params: {
+          page,
+          limit,
+          ...(videoId ? { videoId } : {}), // Only add videoId if it exists
+        },
       });
-      console.log({res});
       return res.data.data;
     } catch (error) {
       return rejectWithValue(
@@ -34,9 +37,9 @@ export const getMyPlaylists = createAsyncThunk(
 
 export const getPlaylistById = createAsyncThunk(
   'playlists/getPlaylistById',
-  async ({playlistId}, { rejectWithValue }) => {
+  async ({ playlistId, page = 1, limit = 10 }, { rejectWithValue }) => {
     try {
-      const res = await api.get(`/playlists/${playlistId}`);
+      const res = await api.get(`/playlists/${playlistId}?page=${page}&limit=${limit}`);
       return res.data.data;
     } catch (error) {
       return rejectWithValue(
@@ -92,8 +95,8 @@ export const deletePlaylist = createAsyncThunk(
   'playlists/deletePlaylist',
   async ({playlistId}, { rejectWithValue }) => {
     try {
-      const res = await api.delete(`/playlists/${playlistId}`);
-      return res.data.data;
+      await api.delete(`/playlists/${playlistId}`);
+      return playlistId;
     } catch (error) {
       return rejectWithValue(
         error.response?.data?.message || 'Cannot delete playlist'

@@ -130,71 +130,75 @@ const getLikedVideos = asyncHandler(async (req, res) => {
 
   const page = Number(req.query.page) || 1;
   const limit = Number(req.query.limit) || 10;
-  const skip = (page - 1) * limit;
+ 
 
-  const likedVideos = await Like.aggregate([
+  const result = await Like.aggregate([
     {
       $match: {
-        likedBy: new mongoose.Types.ObjectId(userId),
-        video: { $exists: true, $ne: null }, //$exists: true alone is not enough,MongoDB treats null as existing so $ne:null
-        value: 1, //only likes no dislikes
+        likedBy: userId,
+        video: { $exists: true, $ne: null },
+        value: 1,
       },
     },
+    { $sort: { createdAt: -1 } },
     {
-      $sort: { createdAt: -1 }, // most recent first
-    },
-    { $skip: skip },
-    { $limit: limit },
-    {
-      //lookup the video Details
-      $lookup: {
-        from: "videos",
-        localField: "video",
-        foreignField: "_id",
-        as: "videoDetails",
-        pipeline: [
-          {
-            $match: { isPublished: true },
-          },
+      $facet: {
+        videos: [
+          { $skip: (page - 1) * limit },
+          { $limit: limit },
           {
             $lookup: {
-              from: "users",
-              localField: "owner",
+              from: "videos",
+              localField: "video",
               foreignField: "_id",
-              as: "owner",
+              as: "videoDetails",
+              pipeline: [
+                { $match: { isPublished: true } },
+                {
+                  $lookup: {
+                    from: "users",
+                    localField: "owner",
+                    foreignField: "_id",
+                    as: "owner",
+                  },
+                },
+                { $unwind: "$owner" },
+                {
+                  $project: {
+                    thumbnail: 1,
+                    title: 1,
+                    duration: 1,
+                    viewCount: { $size: { $ifNull: ["$views", []] } },
+                    owner: { username: 1, avatar: 1 },
+                    createdAt: 1,
+                  },
+                },
+              ],
             },
           },
-          {
-            $unwind: "$owner",
-          },
-          {
-            $project: {
-              thumbnail: 1,
-              title: 1,
-              duration: 1,
-              viewCount: { $size: { $ifNull: ["$views", []] } },
-              owner: {
-                username: "$owner.username",
-                avatar: "$owner.avatar",
-              },
-              createdAt: 1,
-            },
-          },
+          { $unwind: "$videoDetails" },
+          { $replaceRoot: { newRoot: "$videoDetails" } },
         ],
+        totalCount: [{ $count: "count" }],
       },
     },
-    {
-      $unwind: "$videoDetails",
-    },
-    {
-      //throws away the current document(like) and make videoDetails the new current document
-      $replaceRoot: {newRoot: "$videoDetails"},
-    }
   ]);
+
+  const videos = result[0]?.videos || [];
+  const total = result[0]?.totalCount[0]?.count || 0;
+
+
   return res
     .status(200)
     .json(
-      new ApiResponse(200, likedVideos, "Liked videos fetched successfully")
+      new ApiResponse(200, {
+        videos,
+      pagination: {
+        total,
+        page,
+        hasNextPage: page * limit < total,
+      }
+      }, "Liked videos fetched successfully")
     );
 });
 const getVideoReactions = asyncHandler(async (req, res) => {

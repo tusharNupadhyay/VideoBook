@@ -78,9 +78,9 @@ export const getChannelVideos = createAsyncThunk("video/getChannelVideos", async
 });
 
 //fetch my videos throught userId (PRIVATE)
-export const getMyVideos = createAsyncThunk("video/getMyVideos", async(_,{rejectWithValue})=>{
+export const getMyVideos = createAsyncThunk("video/getMyVideos", async({page="1",limit="10"},{rejectWithValue})=>{
   try {
-      const res = await api.get('/videos/my-videos');
+      const res = await api.get(`/videos/my-videos?page=${page}&limit=${limit}`);
       return res.data.data;
   } catch (error) {
     return rejectWithValue(error.response?.data?.message || "Failed to fetch your Videos");
@@ -100,18 +100,26 @@ export const updateVideoDetails = createAsyncThunk("video/updateVideoDetails",as
   }
 })
 
-export const getWatchHistory = createAsyncThunk("video/getWatchHistory",async(_,{rejectWithValue})=>{
+export const getWatchHistory = createAsyncThunk("video/getWatchHistory",async({ page = 1, limit = 10 },{rejectWithValue})=>{
   try {
-    const res = await api.get('/users/history');
+    const res = await api.get(`/users/history?page=${page}&limit=${limit}`);//return {history,pagination: {total..}}
     return res.data.data;
   } catch (error) {
     return rejectWithValue(error.response?.data?.message || "Failed to fetch watch history");
   }
 })
-export const getLikedVideos = createAsyncThunk("video/getLikedVideos",async(_,{rejectWithValue})=>{
+export const clearWatchHistory = createAsyncThunk("video/clearWatchHistory",async(_,{rejectWithValue})=>{
   try {
-    const res = await api.get('/likes/videos');
+    const res = await api.patch('/users/clear-history');
     return res.data.data;
+  } catch (error) {
+    return rejectWithValue(error.response?.data?.message || "Failed to clear watch history");
+  }
+})
+export const getLikedVideos = createAsyncThunk("video/getLikedVideos",async({ page = 1, limit = 10 },{rejectWithValue})=>{
+  try {
+    const res = await api.get(`/likes/videos?page=${page}&limit=${limit}`);
+    return res.data.data; //return {videos,pagination: {total,page,hasNextPage}}
   } catch (error) {
     return rejectWithValue(error.response?.data?.message || "Failed to fetch liked videos");
   }

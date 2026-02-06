@@ -26,6 +26,7 @@ export function VideoPlaylist({ videoId, viewCount }) {
       {/* FLOATING SAVE POPUP */}
       {isSaveOpen && (
         <AddToPlaylistModal
+        key={videoId}
           videoId={videoId}
           onClose={() => setIsSaveOpen(false)}
           onCreateNew={() => {

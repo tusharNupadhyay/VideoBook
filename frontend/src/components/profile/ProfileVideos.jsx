@@ -1,23 +1,48 @@
 import { useEffect, useRef } from "react";
-import { useAppDispatch } from "../../app/hooks";
+import { useAppDispatch,useAppSelector } from "../../app/hooks";
 import VideoCard from "../../pages/VideoCard"
 import { BiVideoOff } from "react-icons/bi";
 import { getChannelVideos } from "../../features/video/videoAction";
+import { resetChannelVideos } from "../../features/video/videoSlice";
 
 
-export default function ProfileVideos({ videos, loading, hasNextPage, page, username }){
+export default function ProfileVideos({ username }){
     
     const dispatch = useAppDispatch();
   const sentinelRef = useRef(null);
 
+  const { videos, loading, hasNextPage, page } = useAppSelector(
+    (state) => state.video.channelVideos
+  );
+
+
+  // Handle Initial Fetch & Cleanup when Username changes
+  useEffect(() => {
+    if (username) {
+      dispatch(resetChannelVideos()); // Clear old channel's videos first
+      dispatch(getChannelVideos({ username, page: 1 }));
+    }
+    
+    // Cleanup when leaving the page entirely
+    return () => {
+      dispatch(resetChannelVideos());
+    };
+  }, [username, dispatch]);
+
+  // Handle Infinite Scroll
   useEffect(() => {
     const observer = new IntersectionObserver((entries) => {
       if (entries[0].isIntersecting && hasNextPage && !loading) {
         dispatch(getChannelVideos({ username, page: page + 1 }));
       }
     });
-    if (sentinelRef.current) observer.observe(sentinelRef.current);
-    return () => observer.disconnect();
+
+    const currentSentinel = sentinelRef.current;
+    if (currentSentinel) observer.observe(currentSentinel);
+    
+    return () => {
+      if (currentSentinel) observer.disconnect();
+    };
   }, [hasNextPage, page, loading, username, dispatch]);
 
 
@@ -29,7 +54,7 @@ export default function ProfileVideos({ videos, loading, hasNextPage, page, user
         ))}
       </div>
 
-      {/* Sentinel for Infinite Scroll */}
+      {/* Sentinel */}
       <div ref={sentinelRef} className="h-10 w-full flex justify-center">
         {loading && <div className="animate-spin h-6 w-6 border-2 border-t-white rounded-full" />}
       </div>
