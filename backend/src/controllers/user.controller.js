@@ -128,13 +128,20 @@ const loginUser = asyncHandler(async (req, res) => {
   // const isProduction = process.env.NODE_ENV === "production";
   //cookies
   //by setting these conditions true, cookies will only be modified by server not frontend
+  // const options = {
+  //   httpOnly: true, //makes cookies inaccessible to javascript in the browser(document.cookie),protect against xss attacks
+  //   secure: true, //cookies sent only over https not http
+  //   //secure: true may prevent cookies from being set, so use secure: process.env.NODE_ENV = "production"
+  //   sameSite: "none",
+  //   path: "/",
+  // };
+
   const options = {
-    httpOnly: true, //makes cookies inaccessible to javascript in the browser(document.cookie),protect against xss attacks
-    secure: true, //cookies sent only over https not http
-    //secure: true may prevent cookies from being set, so use secure: process.env.NODE_ENV = "production"
-    sameSite: "none",
-    path: "/",
-  };
+    httpOnly: true,
+    secure: true,
+    sameSite: "None",
+    path: "/",        
+};
   return res
     .status(200)
     .cookie("accessToken", accessToken, options) //creates cookie in user's browerser's storage
@@ -154,13 +161,19 @@ const logOutUser = asyncHandler(async (req, res) => {
 
   await User.findByIdAndUpdate(req.user._id, { $unset: { refreshToken: 1 } }); //1 is ignored,you can use anything("",true,1)
 
-  const isProduction = process.env.NODE_ENV === "production";
-  const options = {
+  // const isProduction = process.env.NODE_ENV === "production";
+  // const options = {
+  //   httpOnly: true,
+  //   secure: isProduction,
+  //   sameSite: isProduction ? "none" : "lax",
+  //   path: "/",
+  // };
+   const options = {
     httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? "none" : "lax",
-    path: "/",
-  };
+    secure: true,
+    sameSite: "None",
+    path: "/",        
+};
   return res
     .status(200)
     .clearCookie("accessToken", options)
@@ -184,13 +197,19 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
       throw new ApiError(401, "Refresh token is expired or used");
     // const isProduction =
     //  process.env.NODE_ENV === "production";
-    const options = {
-      httpOnly: true,
-      secure: true,
-      // isProduction ? "none" : "lax",
-      sameSite: "none",
-      path: "/",
-    };
+    // const options = {
+    //   httpOnly: true,
+    //   secure: true,
+    //   // isProduction ? "none" : "lax",
+    //   sameSite: "none",
+    //   path: "/",
+    // };
+     const options = {
+    httpOnly: true,
+    secure: true,
+    sameSite: "None",
+    path: "/",        
+};
     const { accessToken, refreshToken: newRefreshToken } =
       await generateAccessRefreshTokens(user._id);
 
