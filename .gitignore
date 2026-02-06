@@ -19,13 +19,12 @@ build/
 #Backend
 backend/node_modules/
 backend/uploads/
-backend/public/temp/
 backend/public/videos/
 backend/public/thumbnails/
 backend/.env
 backend/.env.*
 backend/public/assets/*
-backend/public
+
 #mongoose debug dumps
 backend/*.dump
 
