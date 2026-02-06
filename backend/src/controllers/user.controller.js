@@ -132,7 +132,7 @@ const loginUser = asyncHandler(async (req, res) => {
     httpOnly: true, //makes cookies inaccessible to javascript in the browser(document.cookie),protect against xss attacks
     secure: true, //cookies sent only over https not http
     //secure: true may prevent cookies from being set, so use secure: process.env.NODE_ENV = "production"
-    sameSite: none,
+    sameSite: "none",
     path: "/",
   };
   return res
@@ -188,7 +188,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
       httpOnly: true,
       secure: true,
       // isProduction ? "none" : "lax",
-      sameSite: none,
+      sameSite: "none",
       path: "/",
     };
     const { accessToken, refreshToken: newRefreshToken } =
