@@ -125,14 +125,14 @@ const loginUser = asyncHandler(async (req, res) => {
     "-password -refreshToken"
   );
 
-  const isProduction = process.env.NODE_ENV === "production";
+  // const isProduction = process.env.NODE_ENV === "production";
   //cookies
   //by setting these conditions true, cookies will only be modified by server not frontend
   const options = {
     httpOnly: true, //makes cookies inaccessible to javascript in the browser(document.cookie),protect against xss attacks
-    secure: isProduction, //cookies sent only over https not http
+    secure: true, //cookies sent only over https not http
     //secure: true may prevent cookies from being set, so use secure: process.env.NODE_ENV = "production"
-    sameSite: isProduction ? "none" : "lax",
+    sameSite: none,
     path: "/",
   };
   return res
@@ -182,11 +182,13 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
     if (!user) throw new ApiError(401, "Invalid Refresh Token");
     if (incomingRefreshToken !== user?.refreshToken)
       throw new ApiError(401, "Refresh token is expired or used");
-    const isProduction = process.env.NODE_ENV === "production";
+    // const isProduction =
+    //  process.env.NODE_ENV === "production";
     const options = {
       httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? "none" : "lax",
+      secure: true,
+      // isProduction ? "none" : "lax",
+      sameSite: none,
       path: "/",
     };
     const { accessToken, refreshToken: newRefreshToken } =
