@@ -13,7 +13,7 @@ export default function AuthLayout() {
   }, [dispatch]);
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-[#0f0f0f] text-white p-4">
-      {/* 2. Brand / Home Section */}
+      {/*  Brand / Home Section */}
       <div className="mb-8 flex flex-col items-center gap-4">
         <Link
           to="/"
@@ -23,7 +23,7 @@ export default function AuthLayout() {
           <span className="text-sm font-medium">Back to Home</span>
         </Link>
 
-        <h1 className="text-3xl font-bold tracking-tight">YourPlatform</h1>
+        <h1 className="text-3xl font-bold tracking-tight">VideoBook</h1>
       </div>
 
       {/* 3. Main Form Container */}
