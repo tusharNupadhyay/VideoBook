@@ -10,7 +10,7 @@ import Upload from "./Upload";
 import Watch from "./Watch";
 import MyVideos from "./MyVideos";
 import EditVideosPage from "./EditVideosPage";
-import LikedVideos from "./likedVideos";
+import LikedVideos from "./LikedVideos.jsx";
 import WatchHistory from "./WatchHistory";
 import PlaylistDetails from "./PlaylistDetails";
 import EditProfile from "./EditProfile";
