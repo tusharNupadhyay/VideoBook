@@ -1,5 +1,6 @@
 import api from '../../lib/axios';
 import { createAsyncThunk } from '@reduxjs/toolkit';
+import { useAppDispatch } from '../../app/hooks';
 
 export const uploadVideo = createAsyncThunk(
   'video/upload',
@@ -128,6 +129,11 @@ export const getLikedVideos = createAsyncThunk("video/getLikedVideos",async({ pa
 export const deleteVideo = createAsyncThunk("video/deleteVideo",async(videoId,{rejectWithValue})=>{
   try {
     const res = await api.delete(`/videos/id/${videoId}`);
+    const dispatch = useAppDispatch();
+    dispatch(fetchAllVideos());
+    dispatch(getMyVideos());
+    dispatch(getLikedVideos());
+    dispatch(getWatchHistory());
     return res.data.data;
   } catch (error) {
         return rejectWithValue(error.response?.data?.message || "Failed to delete video");
