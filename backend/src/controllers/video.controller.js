@@ -9,6 +9,7 @@ import {
 import { ApiResponse } from "../utils/ApiResponse.js";
 import mongoose from "mongoose";
 import { Like } from "../models/like.model.js";
+import { Comment } from "../models/comment.model.js";
 
 const validateVideoId = (id) => {
   if (!id) throw new ApiError(400, "Id is missing");
@@ -300,8 +301,25 @@ const deleteVideo = asyncHandler(async (req, res) => {
   if (video.thumbnail) await deleteFromCloudinary(video.thumbnail);
   if (video.videoFile) await deleteFromCloudinary(video.videoFile);
 
-  //delete from the mongodb document
+  // Remove video reference from all users' history and likes
+  await User.updateMany(
+    {}, 
+    { 
+      $pull: { 
+        watchHistory: videoId, 
+      } 
+    }
+  );
+
+  // Delete all likes associated with this video
+  await Like.deleteMany({ video: videoId });
+
+  // Delete all comments associated with this video
+  await Comment.deleteMany({ video: videoId });
+
+  // Finally, delete the video document itself
   await Video.findByIdAndDelete(videoId);
+
   return res
     .status(200)
     .json(new ApiResponse(200, videoId, "Video deleted successfully"));
