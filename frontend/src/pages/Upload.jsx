@@ -6,6 +6,8 @@ import { clearUploadError } from '../features/video/videoSlice';
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { BiImageAdd } from 'react-icons/bi';
+import { useEffect } from 'react';
+
 
 export default function Upload() {
   const dispatch = useAppDispatch();
@@ -23,6 +25,17 @@ export default function Upload() {
     reset,
     resetField,
   } = useForm();
+
+  useEffect(() => {
+  const handleBeforeUnload = (e) => {
+    if (uploadLoading) {
+      e.preventDefault();
+      e.returnValue = ''; // to show the warning when we refresh
+    }
+  };
+  window.addEventListener('beforeunload', handleBeforeUnload);
+  return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+}, [uploadLoading]);
 
   // Helper to generate a preview URL
   const handleThumbnailChange = (e) => {

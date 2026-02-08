@@ -25,7 +25,7 @@ function DisplayComment({ comment,videoOwner }) {
     
   const isLoggedIn = !!userInfo; //boolean
   const reactions = comment.reactions || {};
-  const disableReactions = !isLoggedIn || isLoading;
+  // const disableReactions = !isLoggedIn || isLoading;
   
 
   //edit state
@@ -107,8 +107,6 @@ function DisplayComment({ comment,videoOwner }) {
           >
             {reactions.userReaction === -1 ? <BiSolidDislike className="text-red-500" /> : <BiDislike />}
           </button>
-          
-          <button className="text-xs font-bold text-neutral-400 hover:text-white px-2 py-1 rounded-full">Reply</button>
         </div>
       </div>
 

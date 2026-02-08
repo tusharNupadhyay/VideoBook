@@ -1,45 +1,88 @@
 ## 🎥 VideoBook
 
-VideoBook is a full-stack video sharing platform inspired by YouTube, built to demonstrate real-world backend architecture, authentication, media handling, and scalable frontend state management.
+VideoBook is a production-ready, full-stack video hosting platform designed with a high-performance MERN architecture. It features secure JWT-based authentication, complex MongoDB aggregation pipelines, and a seamless media upload workflow.
 
-This project is currently under active development.
+The application is fully deployed and supports authenticated user interactions, video uploads, comments, playlists, and paginated video feeds.
+
+## Live Links
+
+Frontend: https://video-book-navy.vercel.app
+
+Backend API: https://videobook-8ze7.onrender.com
 
 ## 🚀 Features
+
 User & Auth
 
-- User registration and login with JWT authentication
+- User registration and login using JWT (access + refresh tokens)
 
-- Protected routes and authorization middleware
+- Protected routes with authentication middleware
 
 - Public and private user profile APIs
 
-Videos
+- Login-aware API responses
 
-- Upload videos and thumbnails using Cloudinary
-
-- Fetch public video feeds with backend pagination
-
-- View user-specific video lists
-
-- Owner-only actions (edit/delete)
-
-Channels & Subscriptions
-
-- Public channel profiles with subscriber counts
+- Channel profile with subscriber count
 
 - Subscribe / unsubscribe functionality
 
-- Personalized responses based on login state
+Videos
 
-Frontend
+- Upload videos and thumbnails via Cloudinary
+
+- Owner-only video edit & delete operations
+
+- Paginated public video feed
+
+- User-specific video listings
+
+- Aggregation-based data fetching with owner details
+
+Comments
+
+- Add comments to videos
+
+- View video-specific comment threads
+
+- Authenticated comment creation
+
+- Backend pagination support
+
+(Currently supports single-level comments)
+
+Playlists
+
+- Create and delete playlists
+
+- Add / remove videos from playlists
+
+- Fetch playlist details with associated videos
+
+- Owner-based authorization checks
+
+Pagination
+
+- Backend pagination implemented for:
+
+   - Public video feed
+
+   - User video listings
+
+   - Comments
+
+- Frontend pagination integrated with Redux async flows
+
+Frontend Architecture
 
 - Global state management using Redux Toolkit
 
-- Async API handling with Redux thunks
+- Async logic handled with Redux Thunks
 
-- Responsive UI built with Tailwind CSS
+- Feature-based slice structure (auth, user, video, comment, playlist)
 
-- Client-side routing using React Router
+- Client-side routing with React Router
+
+- Responsive UI built using Tailwind CSS
 
 ## 🛠️ Tech Stack
 
@@ -77,19 +120,29 @@ Tools
 
 - Postman
 
+Database
+
 - MongoDB Atlas
 
 ## Backend Highlights
 
-- Designed RESTful APIs following clean controller and middleware patterns.
+- Designed RESTful APIs using clean controller + middleware patterns
 
-- Implemented optimized MongoDB aggregation pipelines to fetch relational data, compute statistics, and generate personalized     response fields in a single query.
+- Implemented optimized MongoDB aggregation pipelines to:
 
-- Authentication-aware APIs that dynamically include or exclude fields based on user login state.
+- Join relational data
 
-- Scalable media upload pipeline using Multer and Cloudinary.
+- Compute derived statistics (subscriber count, etc.)
 
-- Backend pagination for large video collections.
+- Dynamically include login-aware fields
+
+- Built authentication-aware APIs that modify responses based on user state
+
+- Implemented secure media upload pipeline using Multer + Cloudinary
+
+- Implemented scalable backend pagination for large datasets
+
+- Structured monorepo architecture separating frontend and backend
 
 ## 📂 Project Structure
 
@@ -147,18 +200,13 @@ Frontend
 
 ## Future Improvements
 
-- Comment system
+- Video search and filtering
 
-- Playlists
+- Advanced filtering (date, popularity)
 
-- Frontend pagination / infinite scroll
+- Nested comment threads
 
-- Improved search and filtering
+- Performance optimizations
 
-- Basic tests
+- Improved UI polish
 
-📌 Notes
-
-- Backend is connected to MongoDB Atlas.
-
-- Deployment is planned after core features are completed.
