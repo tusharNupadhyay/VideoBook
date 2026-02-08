@@ -129,14 +129,17 @@ const publishVideo = asyncHandler(async (req, res) => {
   const thumbnail = await uploadOnCloudinary(thumbnailLocalPath);
   if (!video) throw new ApiError(500, "Error while uploading video file");
   if (!thumbnail) throw new ApiError(500, "Error while uploading thumbnail");
-  const uploadedVideo = await Video.create({
+  const newVideo = await Video.create({
     videoFile: video.url,
     thumbnail: thumbnail.url,
     duration: video.duration,
     title,
     description,
     owner: req.user._id,
-  }).select("-videoFile -description ")
+  });
+  await newVideo.save();
+  const uploadedVideo = await Video.findById(newVideo._id).select("-videoFile -description ");
+
   if (!uploadedVideo)
     throw new ApiError(
       500,
