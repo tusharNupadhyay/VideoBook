@@ -18,6 +18,14 @@ app.use(express.static("public"));
 //attaches cookies to req so you can use req.cookies
 app.use(cookieParser());
 
+//landing page for render link 
+app.get("/",(req,res)=>{
+  res.status(200).json({
+    status: "active",
+    message: "VideoBook API is online and healthy",
+    uptime: process.uptime() // shows how long the server has been running
+  })
+});
 //Routes import
 import userRouter from "./routes/user.routes.js";
 import videoRouter from "./routes/video.routes.js";
